@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% set nav = 'library' %}
+{% block title %}视频库{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1 class="ph-title">视频库</h1>
+  <span class="ph-sub">已用 <b id="libUsed">-</b></span>
+  <span class="spacer"></span>
+  <label class="btn sm" for="libFile" style="cursor:pointer">上传视频</label>
+  <input id="libFile" type="file" accept="video/*" style="display:none">
+</div>
+
+<div class="card">
+  <div class="card-hd"><span class="dot"></span>文件列表</div>
+  <div class="card-bd" style="padding:0">
+    <div class="tbl-scroll">
+      <table id="libTable">
+        <thead><tr><th>文件</th><th>大小</th><th>上传时间</th><th>操作</th></tr></thead>
+        <tbody><tr><td colspan="4" class="hint">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<p class="hint" style="margin-top:12px">本地上传投稿不消耗服务器流量；只有开启「定时投稿（云端发布）」时才按文件大小扣流量。</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const api = BP.api, esc = BP.esc, ts = BP.ts, mb = BP.mb;
+
+async function loadLib(){
+  const d = await api('/api/library');
+  document.getElementById('libUsed').textContent = mb(d.used_mb);
+  const tb = document.querySelector('#libTable tbody');
+  tb.innerHTML = d.items.length ? d.items.map(f => (
+    '<tr><td>' + esc(f.name) + '</td><td>' + mb(f.size_mb) + '</td><td>' + ts(f.created_at) + '</td>' +
+    '<td><button class="btn danger sm" data-del="' + f.id + '">删除</button></td></tr>'
+  )).join('') : '<tr><td colspan="4" class="hint">还没有上传文件</td></tr>';
+  tb.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    await api('/api/library/' + b.dataset.del, {method:'DELETE'});
+    loadLib();
+  });
+}
+
+document.getElementById('libFile').onchange = async function(){
+  const f = this.files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  BP.toast('上传中…');
+  try{
+    const res = await fetch('/api/library/upload', {method:'POST', body: fd, credentials:'same-origin'});
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.detail || '上传失败');
+    BP.toast('已上传 ' + d.name);
+    loadLib();
+  }catch(e){ BP.toast(e.message, 'err'); }
+  this.value = '';
+};
+loadLib().catch(e => BP.toast(e.message, 'err'));
+</script>
+{% endblock %}

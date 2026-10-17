@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% set nav = 'dashboard' %}
+{% block title %}总览{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>总览</h1>
+  <div class="spacer"></div>
+  <a class="btn sm" href="/accounts/add">＋ 添加账号</a>
+</div>
+
+<div class="grid2" style="margin-bottom:14px">
+  <div class="card" style="margin:0">
+    <div class="card-bd" style="display:flex;align-items:center;gap:13px">
+      <span class="ava" style="width:44px;height:44px;flex:0 0 auto;border-radius:11px;overflow:hidden;background:#fff1f5;color:#fb7299;display:flex;align-items:center;justify-content:center;font-weight:700">33</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700">AI 助手</div>
+        <div class="hint">本站的运维机娘：风控、投稿、互赞、模板、定时任务，有问题直接问她</div>
+      </div>
+      <a class="btn sm" href="/ai">去对话</a>
+    </div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="stat"><div class="k">账号总数</div><div class="v" id="s-total">–</div></div>
+  <div class="stat"><div class="k">登录有效</div><div class="v" id="s-ok">–</div></div>
+  <div class="stat"><div class="k">硬币合计</div><div class="v" id="s-coins">–</div></div>
+  <div class="stat"><div class="k">粉丝合计</div><div class="v" id="s-fans">–</div></div>
+</div>
+<div class="grid" style="margin-top:14px">
+  <div class="stat"><div class="k">稿件合计</div><div class="v" id="s-videos">–</div></div>
+  <div class="stat"><div class="k">今日操作</div><div class="v" id="s-today">–</div></div>
+  <div class="stat"><div class="k">累计操作</div><div class="v" id="s-totalops">–</div></div>
+  <div class="stat"><div class="k">失效账号</div><div class="v" id="s-bad">–</div></div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <div class="card-hd"><i class="dot"></i>动作统计（累计成功）</div>
+  <div class="card-bd"><div class="kv" id="stat-kv"><span class="hint">加载中…</span></div></div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <div class="card-hd"><i class="dot"></i>近 7 天数据趋势 <span class="hint">播放量 / 点赞 / 涨粉（每天新增）</span></div>
+  <div class="card-bd">
+    <div class="tr-lg" id="tr-lg"><span class="hint">加载中…</span></div>
+    <div id="trend"></div>
+    <a class="tr-more" href="/trend">点击查看详情<span>查看每个账号各自的趋势图 →</span></a>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <div class="card-hd"><i class="dot"></i>账号概览</div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>账号</th><th>UID</th><th>粉丝</th><th>稿件</th><th>硬币</th><th>等级</th><th>状态</th><th>最近体检</th></tr></thead>
+      <tbody id="accs"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="clp-more" id="accsMore"></div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <div class="card-hd"><i class="dot"></i>最近操作</div>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>时间</th><th>账号</th><th>目标</th><th>动作</th><th>结果</th></tr></thead>
+      <tbody id="recent"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="clp-more" id="recentMore"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+var ACT={like:'点赞',coin:'投币',coin1:'投币',coin2:'投币x2',fav:'收藏',comment:'评论',
+         share:'分享',share_dyn:'转发动态',follow:'关注',play:'播放',opus:'点赞图文',
+         dm:'私信',interact:'互赞',upload:'投稿'};
+var TRC={play:'#00aeec',like:'#fb7299',fans:'#52c41a'};
+var TRLAST=null;
+
+function maskUid(u){u=(u==null?'':''+u);if(u.length<=5)return u;return u.slice(0,3)+'…'+u.slice(-2)}
+
+/* 折叠：默认只显示前 3 行，可展开 */
+function clamp(tbodyId, moreId, n){
+  var tb=document.getElementById(tbodyId), more=document.getElementById(moreId);
+  if(!tb||!more) return;
+  var rows=Array.from(tb.querySelectorAll('tr'));
+  if(rows.length<=n){ more.innerHTML=''; return; }
+  rows.forEach(function(r,i){ if(i>=n) r.style.display='none'; });
+  more.innerHTML='<button class="btn ghost sm" id="'+moreId+'_btn">展开全部 '+rows.length+' 条</button>';
+  var open=false;
+  document.getElementById(moreId+'_btn').onclick=function(){
+    open=!open;
+    rows.forEach(function(r,i){ if(i>=n) r.style.display=open?'':'none'; });
+    this.textContent=open?'收起':('展开全部 '+rows.length+' 条');
+  };
+}
+
+/* 7 天趋势折线（与原站 drawTrend 同算法） */
+function drawTrend(t){
+  var box=document.getElementById('trend'); if(!box) return;
+  TRLAST=t; t=t||{};
+  var dates=t.dates||[], pts=t.points||0, tot=t.total||{};
+  var sumK=function(k){return (t[k]||[]).reduce(function(a,b){return a+(b||0)},0)};
+  document.getElementById('tr-lg').innerHTML=[['play','播放量'],['like','点赞'],['fans','涨粉']].map(function(x){
+    var inc=sumK(x[0]);
+    return '<span class="tri"><i style="background:'+TRC[x[0]]+'"></i>'+x[1]
+      +'<b>'+fmtN(tot[x[0]]||0)+'</b><em>'+(inc>0?('近7天 +'+fmtN(inc)):('近7天 '+(inc<0?fmtN(inc):'0')))+'</em></span>';
+  }).join('');
+
+  var W=Math.max(240, box.clientWidth||700);
+  var H=Math.max(84, Math.min(118, Math.round(W*0.13)));
+  var n=dates.length, P=10, svg='', xs=[];
+  var anyData = pts>=2 && (sumK('play')+sumK('like')+Math.abs(sumK('fans')))>0;
+  for(var i=0;i<n;i++) xs.push(n<2? W/2 : P+i*(W-2*P)/(n-1));
+
+  if(anyData){
+    for(var g=0;g<=2;g++){
+      var gy=Math.round(H-P-g*(H-2*P)/2);
+      svg+='<line x1="0" y1="'+gy+'" x2="'+W+'" y2="'+gy+'" stroke="#eef1f5" stroke-width="1"/>';
+    }
+    [['play',TRC.play],['like',TRC.like],['fans',TRC.fans]].forEach(function(s){
+      var arr=t[s[0]]||[], mx=0;
+      arr.forEach(function(v){ mx=Math.max(mx, Math.max(0,v||0)); });
+      var poly=[], dots='';
+      for(var i=0;i<n;i++){
+        var v=Math.max(0, arr[i]||0);
+        var y = mx>0 ? (H-P-(v/mx)*(H-2*P)) : (H-P);
+        poly.push(xs[i].toFixed(1)+','+y.toFixed(1));
+        dots+='<circle cx="'+xs[i].toFixed(1)+'" cy="'+y.toFixed(1)+'" r="2.4" fill="#fff" stroke="'+s[1]+'" stroke-width="2"/>';
+      }
+      svg+='<polyline fill="none" stroke="'+s[1]+'" stroke-width="2" stroke-linejoin="round" '
+        +'stroke-linecap="round" points="'+poly.join(' ')+'"/>'+dots;
+    });
+  }
+
+  box.innerHTML='<svg class="tr-svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+svg+'</svg>'
+    +(anyData?'':'<div class="tr-empty">'
+      +(pts<2?('今天已记下 '+(pts||0)+' 个数据点，凑够两天就能看到曲线'):'今天的数据已记下，明天开始显示曲线变化')
+      +'（每天 10:00 自动记录；点账号「体检」也会记一次）</div>')
+    +'<div class="tr-x">'+dates.map(function(d){return '<span>'+BP.esc(d)+'</span>'}).join('')+'</div>';
+}
+window.addEventListener('resize', function(){ if(TRLAST) drawTrend(TRLAST); });
+
+(async function(){
+  try{
+    var d = await BP.api('/api/dashboard');
+    var el=function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+    el('s-total', d.total); el('s-ok', d.ok); el('s-coins', d.coins); el('s-fans', d.fans);
+    el('s-videos', d.videos); el('s-today', d.today_ops); el('s-totalops', d.total_ops);
+    el('s-bad', d.bad);
+
+    var k=[['like','点赞'],['coin','投币'],['fav','收藏'],['comment','评论'],
+           ['share','分享'],['follow','关注'],['play','播放'],['dm','私信']];
+    document.getElementById('stat-kv').innerHTML=k.map(function(x){
+      return '<span>'+x[1]+' <b>'+(d.stat[x[0]]||0)+'</b></span>';
+    }).join('');
+
+    drawTrend(d.trend);
+
+    var tb=document.getElementById('accs');
+    tb.innerHTML=d.accounts.length? d.accounts.map(function(a){
+      var st=a.status==='ok'?'<span class="tag ok">正常</span>':'<span class="tag err">失效</span>';
+      var ck=(a.last_check_at&&a.last_check_at!=='未体检')
+        ? ('<span class="chk-time">'+BP.esc(a.last_check_at)+'</span>')
+        : '<span class="chk-none">未体检</span>';
+      return '<tr><td class="c-uname"><b title="'+BP.esc(accName(a))+'">'+BP.esc(accName(a))+'</b></td>'
+        +'<td class="c-mid" title="UID '+BP.esc(a.mid)+'">'+BP.esc(maskUid(accMid(a)))+'</td>'
+        +'<td>'+a.fans+'</td><td>'+a.videos+'</td><td>'+a.coins+'</td><td>Lv'+a.level+'</td>'
+        +'<td>'+st+'</td><td>'+ck+'</td></tr>';
+    }).join('') : '<tr><td colspan="8" class="empty">还没有账号，去 <a href="/accounts/add">添加账号</a> 吧</td></tr>';
+
+    var rc=document.getElementById('recent');
+    rc.innerHTML=d.recent.length? d.recent.map(function(r){
+      var s2=r.code===0?'<span class="tag ok">成功</span>':'<span class="tag err">'+BP.esc(r.code)+'</span>';
+      return '<tr><td class="hint">'+BP.esc(r.time)+'</td><td>'+BP.esc(r.actor)+'</td>'
+        +'<td>'+BP.esc(r.target)+'</td><td>'+(ACT[r.action]||BP.esc(r.action))+'</td>'
+        +'<td>'+s2+' '+BP.esc(r.message)+'</td></tr>';
+    }).join('') : '<tr><td colspan="5" class="empty">暂无记录</td></tr>';
+
+    clamp('accs','accsMore',3);
+    clamp('recent','recentMore',3);
+  }catch(e){ BP.toast(e.message,'err'); }
+})();
+
+</script>
+{% endblock %}

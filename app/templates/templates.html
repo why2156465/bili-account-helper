@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% set nav = 'templates' %}
+{% block title %}模板{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1 class="ph-title">模板管理</h1>
+  <span class="ph-sub">投稿模板与互赞模板统一在这里管理</span>
+  <span class="spacer"></span>
+  <button class="btn ghost sm" id="batchDel" style="display:none">删除选中</button>
+</div>
+
+<div class="seg" style="margin-bottom:12px">
+  <button id="tt-upload" class="on" onclick="tplTab('upload')">投稿模板</button>
+  <button id="tt-interact" onclick="tplTab('interact')">互赞模板</button>
+</div>
+
+<div class="card">
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th><input type="checkbox" id="allBox"></th><th>名称</th><th>内容摘要</th><th>创建时间</th><th>操作</th></tr></thead>
+      <tbody id="list"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var KIND='upload', TPLS=[];
+
+function tplTab(k){
+  KIND=k;
+  document.getElementById('tt-upload').classList.toggle('on',k==='upload');
+  document.getElementById('tt-interact').classList.toggle('on',k==='interact');
+  loadTpls();
+}
+
+function summary(t){
+  var c=t.config||{};
+  if(KIND==='upload'){
+    return [c.title&&('标题：'+c.title), c.tid&&('分区：'+c.tid), c.tag&&('标签：'+c.tag)]
+      .filter(Boolean).join(' · ')||'—';
+  }
+  var acts=Object.keys(c.actions||{});
+  var tg=(c.targets||[]).length;
+  return ('动作 '+(acts.length?acts.join('/'):'无')+' · 目标 '+tg+' 个');
+}
+
+async function loadTpls(){
+  try{
+    var d=await BP.api('/api/templates?kind='+KIND);
+    TPLS=d.templates||[];
+  }catch(e){ TPLS=[]; }
+  var tb=document.getElementById('list');
+  tb.innerHTML=TPLS.length?TPLS.map(function(t){
+    return '<tr><td><input type="checkbox" data-t="'+t.id+'"></td>'
+      +'<td><b>'+BP.esc(t.name)+'</b></td>'
+      +'<td class="hint">'+BP.esc(summary(t))+'</td>'
+      +'<td class="hint">'+BP.esc(new Date((t.created_at||0)*1000).toLocaleString('zh-CN'))+'</td>'
+      +'<td><a class="btn ghost sm" href="/'+(KIND==='upload'?'publish':'tasks')+'?tpl='+t.id+'">使用</a> '
+      +'<button class="btn danger sm" onclick="delTpl('+t.id+')">删除</button></td></tr>';
+  }).join(''):'<tr><td colspan="5" class="empty">这个分类下还没有模板。去「'+(KIND==='upload'?'投稿':'互赞')+'」页把当前配置存为模板。</td></tr>';
+  document.getElementById('batchDel').style.display=TPLS.length?'':'none';
+  document.getElementById('allBox').checked=false;
+}
+
+async function delTpl(id){
+  if(!confirm('删除该模板？')) return;
+  await BP.api('/api/templates/'+id,{method:'DELETE'});
+  BP.toast('已删除'); loadTpls();
+}
+document.getElementById('allBox').onchange=function(){
+  var on=this.checked;
+  document.querySelectorAll('[data-t]').forEach(function(c){ c.checked=on; });
+};
+document.getElementById('batchDel').onclick=async function(){
+  var ids=Array.from(document.querySelectorAll('[data-t]:checked')).map(function(c){return parseInt(c.getAttribute('data-t'))});
+  if(!ids.length){ BP.toast('请先勾选模板','err'); return; }
+  if(!confirm('删除选中的 '+ids.length+' 个模板？')) return;
+  try{
+    await BP.api('/api/templates/batch-delete',{method:'POST',body:JSON.stringify({ids:ids})});
+    BP.toast('已删除 '+ids.length+' 个'); loadTpls();
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+
+loadTpls();
+</script>
+{% endblock %}

@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+{% set nav = 'ai' %}
+{% block title %}AI 助手{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1 class="ph-title">AI 助手</h1>
+  <span class="ph-sub">本站看板娘 · 运维机娘：风控、账号维护、投稿互赞、模板与定时任务都能问</span>
+</div>
+
+<div class="ai-shell">
+  <div class="ai-top">
+    <div class="who"><span class="ava">AI</span>AI 助手</div>
+    <div class="sp"></div>
+    <span class="ai-quota" id="quota"></span>
+    <button class="btn ghost sm" id="clearBtn" type="button">清空</button>
+  </div>
+
+  <div class="ai-msgs" id="msgs"></div>
+
+  <div class="ai-quickwrap" id="quickWrap">
+    <div class="ai-quickhd">
+      <span class="qh-t">常用提问</span>
+      <button class="ai-quick-tg" id="quickTg" type="button">收起 ↑</button>
+    </div>
+    <div class="ai-quick" id="quick"></div>
+  </div>
+
+  <div class="ai-inputbar">
+    <div class="ai-inputbox">
+      <textarea id="input" rows="2" placeholder="把需求告诉我，例如：帮我写一个每天 20 点给关注的人点赞的定时任务"></textarea>
+      <div class="ai-inputbtm">
+        <div class="ai-modwrap">
+          <button class="ai-modelbtn" id="modelBtn" type="button" title="选择模型">
+            <span class="mico">◆</span><span class="mnm" id="modelBtnNm">模型</span>
+            <span class="mver" id="modelBtnVer"></span> ▾
+          </button>
+          <div class="ai-modelmenu" id="modelMenu"></div>
+        </div>
+        <div class="ai-modwrap libwrap">
+          <button class="ai-modelbtn" id="libBtn" type="button" title="插入图片库 / 视频库编号 / 账号">
+            ▤ <span class="mnm">编号</span><span class="mver" id="libCount"></span> ▾
+          </button>
+          <div class="ai-modelmenu" id="libMenu"></div>
+        </div>
+        <span class="sp"></span>
+        <span class="ai-kbd">Enter 发送 · Shift+Enter 换行</span>
+        <button class="btn ai-send" id="sendBtn" type="button" title="发送">发送</button>
+      </div>
+    </div>
+  </div>
+  <div class="ai-tip">AI 助手会答疑并给出可执行方案，确认后一键创建模板 / 定时任务 / AI 任务（含自动私信）；请遵守平台规则合规使用。</div>
+</div>
+
+<div class="card" id="aicfg" style="margin-top:16px">
+  <div class="card-hd"><i class="dot"></i>AI 配置 <span class="hint" id="aicfgRate" style="margin-left:8px"></span></div>
+  <div class="card-bd">
+    <p class="hint">每个账号可以单独配一份 AI，分三种用途：<b>主页总控</b>（能做你在本站能做的一切：互赞/投稿/代理/任务）、<b>私信专用</b>（只能读私信 + 发私信）、<b>养号专用</b>（只能做互赞养成动作）。</p>
+    <p class="hint">在「额外需求」里写清楚你的业务和风格，AI 就会按你的要求干活。可整套<b>存为 AI 模板</b>，一键套到其他账号。</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px">
+      <button class="btn ghost sm" id="acAdd">＋ 新建 AI 配置</button>
+      <span class="hint">当前剩余流量：<b id="acTraffic">—</b></span>
+    </div>
+    <div id="acList"><p class="hint">加载中…</p></div>
+
+    <div id="acForm" style="display:none;margin-top:14px;border-top:1px dashed #e6e8ec;padding-top:14px">
+      <div class="grid2">
+        <div class="field"><label>用途</label>
+          <div class="seg" id="ac-scope">
+            <button data-v="main" class="on">主页总控</button>
+            <button data-v="dm">私信专用</button>
+            <button data-v="nurture">养号专用</button>
+          </div>
+        </div>
+        <div class="field"><label>绑定账号</label><select id="ac-acc"></select></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>配置名称</label><input id="ac-name" type="text" placeholder="如：主力号 · 私信客服"></div>
+        <div class="field"><label>模型</label><select id="ac-model"></select></div>
+      </div>
+      <div class="field"><label>额外需求 / 人设 / 业务说明</label>
+        <textarea id="ac-persona" rows="4" placeholder="例：我是游戏区 up 主，回复粉丝要简短友好；不接广告；遇到问价格的就说看主页动态"></textarea>
+        <div style="margin-top:6px" id="ac-presets"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+        <button class="btn" id="ac-save">保存配置</button>
+        <button class="btn ghost" id="ac-cancel">取消</button>
+      </div>
+    </div>
+
+    <div id="acTpl" style="margin-top:18px;border-top:1px dashed #e6e8ec;padding-top:14px">
+      <p class="sub">AI 模板</p>
+      <div id="acTplList"><p class="hint">加载中…</p></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+var INFO=null, HISTORY=[], BUSY=false, WELCOME='', MODELS=[], CUR=null, ACFG={}, ACSCOPE='main';
+var GUARD=[];
+
+
+function avatar(){return '<span class="ava">33</span>'}
+function addMsg(role, text, actions){
+  var box=document.getElementById('msgs');
+  var d=document.createElement('div');
+  d.className='ai-msg '+(role==='user'?'user':'assistant');
+  var body=esc(text||'').replace(/\n/g,'<br>');
+  var html=(role==='user'?'':avatar())
+    +'<div class="ai-bubble">'+body+'</div>';
+  d.innerHTML=html;
+  box.appendChild(d);
+  if(actions && actions.length){
+    var wrap=document.createElement('div');
+    wrap.className='ai-acts';
+    actions.forEach(function(a){
+      var b=document.createElement('button');
+      b.className='btn sm';
+      b.textContent=a.label||('执行 '+(a.type||''));
+      b.onclick=function(){ applyAction(a,b); };
+      wrap.appendChild(b);
+    });
+    box.appendChild(wrap);
+  }
+  box.scrollTop=box.scrollHeight;
+  return d;
+}
+function typing(on){
+  var t=document.getElementById('typing');
+  if(on && !t){
+    t=document.createElement('div');
+    t.id='typing'; t.className='ai-msg assistant';
+    t.innerHTML=avatar()+'<div class="ai-bubble ai-typing">…思考中</div>';
+    document.getElementById('msgs').appendChild(t);
+    document.getElementById('msgs').scrollTop=9e9;
+  }else if(!on && t){ t.remove(); }
+}
+
+function renderQuota(){
+  if(!INFO||!INFO.quota) return;
+  var q=INFO.quota;
+  document.getElementById('quota').textContent = q.limit<0
+    ? ('剩余不限') : ('剩余 '+(q.limit-q.used)+'/'+q.limit);
+}
+
+async function refreshQuota(showTip){
+  try{
+    var d=await BP.api('/api/ai/quota?_='+Date.now());
+    if(d&&d.quota){ INFO.quota=d.quota; if(d.traffic)INFO.traffic=d.traffic; renderQuota(); }
+  }catch(e){}
+}
+
+async function send(){
+  if(BUSY) return;
+  var ta=document.getElementById('input');
+  var msg=(ta.value||'').trim();
+  if(!msg){ BP.toast('说点什么','err'); return; }
+  addMsg('user',msg);
+  HISTORY.push({role:'user',content:msg});
+  ta.value=''; ta.style.height='auto';
+  BUSY=true; document.getElementById('sendBtn').disabled=true;
+  typing(true);
+  try{
+    var r=await BP.api('/api/ai/chat',{method:'POST',body:JSON.stringify({
+      message:msg, model:(CUR||{}).id, history:HISTORY.slice(-12)})});
+    typing(false);
+    addMsg('assistant', r.reply||'（无回复）', r.actions||[]);
+    HISTORY.push({role:'assistant',content:r.reply||''});
+    if(r.quota&&INFO){ INFO.quota=r.quota; renderQuota(); }
+  }catch(e){
+    typing(false);
+    addMsg('assistant','…'+e.message);
+  }
+  BUSY=false; document.getElementById('sendBtn').disabled=false;
+  document.getElementById('input').focus();
+}
+
+async function applyAction(a, btn){
+  if(!a) return;
+  btn.disabled=true;
+  try{
+    var r=await BP.api('/api/ai/apply',{method:'POST',body:JSON.stringify({
+      type:a.type, payload:a})});
+    BP.toast(r.message||'已完成');
+    btn.textContent='已完成';
+    if(r.detail) addMsg('assistant', r.detail);
+  }catch(e){ BP.toast(e.message,'err'); btn.disabled=false; }
+}
+
+document.getElementById('sendBtn').onclick=send;
+document.getElementById('input').addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); }
+});
+document.getElementById('input').addEventListener('input',function(){
+  this.style.height='auto';
+  this.style.height=Math.min(150,this.scrollHeight)+'px';
+});
+
+/* 常用提问 */
+async function renderQuick(){
+  var qw=document.getElementById('quick');
+  var list=(INFO&&INFO.quick)?INFO.quick:[];
+  if(!list.length){
+    try{ var d=await BP.api('/api/ai/prompts'); list=d.prompts||[]; }catch(e){}
+  }
+  qw.innerHTML=list.map(function(t){
+    return '<span class="ai-quick-tg chip" data-q="'+esc(t)+'">'+esc(t)+'</span>';
+  }).join('');
+  qw.querySelectorAll('[data-q]').forEach(function(c){
+    c.onclick=function(){
+      document.getElementById('input').value=c.getAttribute('data-q');
+      send();
+    };
+  });
+}
+document.getElementById('quickTg').onclick=function(){
+  var w=document.getElementById('quickWrap');
+  w.classList.toggle('collapsed');
+  this.textContent=w.classList.contains('collapsed')?'展开 ↓':'收起 ↑';
+  try{ localStorage.setItem('ai_quick_hide', w.classList.contains('collapsed')?'1':'0'); }catch(e){}
+};
+
+/* 模型选择 */
+function renderModels(){
+  document.getElementById('modelMenu').innerHTML=MODELS.map(function(m){
+    return '<div class="mi" data-m="'+esc(m.id)+'">'+esc(m.name||m.id)+' <span class="hint">'+esc(m.ver||'')+'</span></div>';
+  }).join('');
+  document.querySelectorAll('#modelMenu .mi').forEach(function(el){
+    el.onclick=function(){
+      CUR=MODELS.filter(function(m){return m.id===el.getAttribute('data-m')})[0]||null;
+      document.getElementById('modelBtnNm').textContent=CUR?CUR.name:'' ;
+      document.getElementById('modelBtnVer').textContent=CUR?(CUR.ver||''):'';
+      document.getElementById('modelMenu').style.display='none';
+    };
+  });
+}
+document.getElementById('modelBtn').onclick=function(){
+  var m=document.getElementById('modelMenu');
+  m.style.display=m.style.display==='block'?'none':'block';
+};
+
+/* 编号快捷插入 */
+document.getElementById('libBtn').onclick=async function(){
+  var menu=document.getElementById('libMenu');
+  if(menu.style.display==='block'){ menu.style.display='none'; return; }
+  menu.innerHTML='<div class="mi">加载中…</div>';
+  menu.style.display='block';
+  try{
+    var d=await BP.api('/api/ai/assets');
+    var n=((d.images||[]).length+(d.videos||[]).length+(d.accounts||[]).length);
+    var c=document.getElementById('libCount');
+    if(c){ c.textContent=n?String(n):''; }
+    var html='';
+    if((d.accounts||[]).length){
+      html+='<div class="mi" style="opacity:.6">账号</div>'+d.accounts.map(function(a){
+        return '<div class="mi" data-v="'+a.id+'">#'+a.id+' '+esc(a.uname||a.mid)+'</div>';
+      }).join('');
+    }
+    if((d.videos||[]).length){
+      html+='<div class="mi" style="opacity:.6">视频库</div>'+d.videos.map(function(v){
+        return '<div class="mi" data-v="'+v.code+'">'+esc(v.name)+'（#'+v.code+'）</div>';
+      }).join('');
+    }
+    if((d.images||[]).length){
+      html+='<div class="mi" style="opacity:.6">图片库</div>'+d.images.map(function(i){
+        return '<div class="mi" data-v="'+i.code+'">图片 #'+i.code+'</div>';
+      }).join('');
+    }
+    menu.innerHTML=html||'<div class="mi">还没有可插入的编号</div>';
+    menu.querySelectorAll('.mi[data-v]').forEach(function(el){
+      el.onclick=function(){
+        var ta=document.getElementById('input');
+        var v=el.textContent;
+        ta.value+=(ta.value?' ':'')+el.getAttribute('data-v');
+        ta.style.height=Math.min(150,ta.scrollHeight)+'px';
+        menu.style.display='none';
+        BP.toast('已插入「'+v+'」');
+      };
+    });
+  }catch(e){ menu.innerHTML='<div class="mi">'+esc(e.message)+'</div>'; }
+};
+
+/* 清空 */
+document.getElementById('clearBtn').onclick=async function(){
+  if(!confirm('清空当前对话记录？\n（只清聊天内容，今日已用次数不会恢复）')) return;
+  try{ await BP.api('/api/ai/clear',{method:'POST'}); }catch(e){}
+  document.getElementById('msgs').innerHTML='';
+  HISTORY=[];
+  addMsg('assistant',WELCOME);
+  refreshQuota();
+};
+
+/* ===== AI 配置 ===== */
+document.querySelectorAll('#ac-scope button').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('#ac-scope button').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on'); ACSCOPE=b.getAttribute('data-v');
+  };
+});
+document.getElementById('acAdd').onclick=function(){
+  document.getElementById('acForm').style.display='';
+  document.getElementById('ac-name').value='';
+  document.getElementById('ac-persona').value='';
+};
+document.getElementById('ac-cancel').onclick=function(){
+  document.getElementById('acForm').style.display='none';
+};
+
+function renderAc(){
+  var box=document.getElementById('acList');
+  var list=ACFG.profiles||[];
+  document.getElementById('ac-acc').innerHTML='<option value="">不绑定（通用）</option>'
+    +(ACFG.accounts||[]).map(function(a){
+        return '<option value="'+a.id+'">'+esc(a.uname||a.mid)+'（#'+a.id+'）</option>';
+      }).join('');
+  document.getElementById('ac-model').innerHTML=(ACFG.models||MODELS).map(function(m){
+    return '<option value="'+esc(m.id)+'">'+esc(m.name||m.id)+'</option>';
+  }).join('');
+  if(!list.length){ box.innerHTML='<p class="hint">还没有 AI 配置。</p>'; return; }
+  var names={main:'主页总控',dm:'私信专用',nurture:'养号专用'};
+  box.innerHTML='<div class="tbl-scroll"><table><thead><tr><th>名称</th><th>用途</th><th>账号</th><th>操作</th></tr></thead><tbody>'
+    +list.map(function(p){
+        var a=(ACFG.accounts||[]).filter(function(x){return x.id===p.account_id})[0];
+        return '<tr><td>'+esc(p.name)+'</td><td>'+esc(names[p.scope]||p.scope)+'</td>'
+          +'<td>'+(a?esc(a.uname||a.mid):'通用')+'</td>'
+          +'<td><button class="btn ghost sm" onclick="acToTpl('+p.id+')">存为模板</button> '
+          +'<button class="btn danger sm" onclick="acDel('+p.id+')">删除</button></td></tr>';
+      }).join('')+'</tbody></table></div>';
+  renderAcTpl();
+}
+function renderAcTpl(){
+  var box=document.getElementById('acTplList');
+  var list=ACFG.templates||[];
+  if(!list.length){ box.innerHTML='<p class="hint">还没有 AI 模板。</p>'; return; }
+  box.innerHTML='<div class="tbl-scroll"><table><thead><tr><th>模板</th><th>操作</th></tr></thead><tbody>'
+    +list.map(function(t){
+        return '<tr><td>'+esc(t.name)+'</td>'
+          +'<td><button class="btn ghost sm" onclick="acUseTpl('+t.id+')">套用到账号</button> '
+          +'<button class="btn danger sm" onclick="acDelTpl('+t.id+')">删除</button></td></tr>';
+      }).join('')+'</tbody></table></div>';
+}
+async function acDel(id){
+  if(!confirm('删除该 AI 配置？')) return;
+  try{ await BP.api('/api/ai/profiles/'+id,{method:'DELETE'}); BP.toast('已删除'); loadAc(); }
+  catch(e){ BP.toast(e.message,'err'); }
+}
+async function acToTpl(id){
+  try{ var r=await BP.api('/api/ai/profiles/'+id+'/template',{method:'POST'}); BP.toast(r.message||'已存为模板'); loadAc(); }
+  catch(e){ BP.toast(e.message,'err'); }
+}
+async function acDelTpl(id){
+  if(!confirm('删除这个 AI 模板？\n（只删模板，已经套用过它的 AI 配置不受影响）')) return;
+  try{ await BP.api('/api/ai/templates/'+id,{method:'DELETE'}); BP.toast('已删除'); loadAc(); }
+  catch(e){ BP.toast(e.message,'err'); }
+}
+async function acUseTpl(tid){
+  var aid=prompt('套用到哪个账号 ID？（留空 0 = 通用）\n账号：'
+    +(ACFG.accounts||[]).map(function(a){return a.id+'='+(a.uname||a.mid)}).join('、'),'0');
+  if(aid===null) return;
+  try{
+    await BP.api('/api/ai/profiles/from-template',{method:'POST',body:JSON.stringify({
+      template_id:tid, account_id:parseInt(aid||'0')})});
+    BP.toast('已套用'); loadAc();
+  }catch(e){ BP.toast(e.message,'err'); }
+}
+async function loadAc(){
+  try{
+    var inf=await BP.api('/api/ai/info');
+    document.getElementById('aicfgRate').textContent='AI 消耗按流量计费：1MB 流量 ≈ '+(inf.tokens_per_mb||800)+' token';
+    document.getElementById('acTraffic').textContent=(inf.traffic&&inf.traffic.remain_h)||'—';
+    MODELS=inf.models||MODELS;
+  }catch(e){}
+  try{ ACFG=await BP.api('/api/ai/profiles'); }
+  catch(e){ document.getElementById('acList').innerHTML='<p class="hint">'+esc(e.message)+'</p>'; return; }
+  renderAc();
+  try{
+    var pr=await BP.api('/api/ai/presets');
+    document.getElementById('ac-presets').innerHTML=(pr.presets||[]).map(function(p){
+      return '<span class="chip" data-p="'+esc(p.persona)+'">'+esc(p.name)+'</span>';
+    }).join(' ');
+    document.querySelectorAll('#ac-presets .chip').forEach(function(c){
+      c.onclick=function(){ document.getElementById('ac-persona').value=c.getAttribute('data-p'); };
+    });
+  }catch(e){}
+}
+document.getElementById('ac-save').onclick=async function(){
+  var body={scope:ACSCOPE,
+            account_id:document.getElementById('ac-acc').value?parseInt(document.getElementById('ac-acc').value):null,
+            name:document.getElementById('ac-name').value,
+            model:document.getElementById('ac-model').value,
+            persona:document.getElementById('ac-persona').value};
+  try{
+    await BP.api('/api/ai/profiles',{method:'POST',body:JSON.stringify(body)});
+    BP.toast('已保存');
+    document.getElementById('acForm').style.display='none';
+    loadAc();
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+
+/* ===== 初始化 ===== */
+(async function(){
+  try{
+    try{ if(localStorage.getItem('ai_quick_hide')==='1'){ document.getElementById('quickWrap').classList.add('collapsed'); document.getElementById('quickTg').textContent='展开 ↓'; } }catch(e){}
+    INFO=await BP.api('/api/ai/info');
+  }catch(e){ BP.toast(e.message,'err'); return; }
+  if(!INFO.enabled||!INFO.ready){
+    document.getElementById('msgs').innerHTML='<div class="ai-msg assistant">'+avatar()
+      +'<div class="ai-bubble">…AI 暂时不可用，请稍后再试。</div></div>';
+    return;
+  }
+  WELCOME=INFO.welcome||'';
+  MODELS=INFO.models||[]; CUR=MODELS[0]||null;
+  GUARD=INFO.guard_words||[];
+  if(CUR){
+    document.getElementById('modelBtnNm').textContent=CUR.name||'';
+    document.getElementById('modelBtnVer').textContent=CUR.ver||'';
+  }
+  renderModels(); renderQuota(); renderQuick();
+
+  try{
+    var h=await BP.api('/api/ai/history');
+    if(h.messages&&h.messages.length){
+      h.messages.forEach(function(m){
+        addMsg(m.role, m.content);
+        HISTORY.push({role:m.role,content:m.content});
+      });
+    }else{ addMsg('assistant',WELCOME); }
+  }catch(e){ addMsg('assistant',WELCOME); }
+
+  loadAc();
+  setInterval(refreshQuota, 15000);
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden) refreshQuota();
+  });
+})();
+</script>
+{% endblock %}

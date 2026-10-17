@@ -1,0 +1,83 @@
+{
+ "target": "bili.mssss.cn",
+ "resolved": {
+  "bili.mssss.cn": "1.12.223.182",
+  "mssss.cn": "36.158.231.214",
+  "126.com": "117.135.214.6"
+ },
+ "tls": {
+  "bili.mssss.cn": {
+   "verify": "ok",
+   "issuer": "Let's Encrypt YR2",
+   "san": [
+    "bili.mssss.cn"
+   ],
+   "notBefore": "2026-10-15T14:35:47Z",
+   "notAfter": "2027-01-13T14:35:46Z",
+   "note": "单域名证书，90 天自动签发，未覆盖 www/apex"
+  },
+  "mssss.cn": {
+   "verify": "fail",
+   "err": "self-signed certificate in certificate chain",
+   "note": "apex 与子域证书链不同源，上线流程需统一"
+  }
+ },
+ "mail": {
+  "addr": "bilibiliup1@126.com",
+  "domain": "126.com",
+  "note": "客服邮箱暴露在首页 FAQ 与页脚，开源副本应替换为占位符"
+ },
+ "third_party_loaded": [],
+ "self_hosted_assets": [
+  "/static/css/app.css",
+  "/static/css/client.css",
+  "/static/img/bili_logo.svg",
+  "/static/img/mascot/m22_idea.webp",
+  "/static/img/mascot_2233_door.png",
+  "/static/img/nodata.png"
+ ],
+ "findings": [
+  {
+   "id": "SC-01",
+   "level": "info",
+   "title": "无第三方脚本/CDN 依赖",
+   "detail": "归档 HTML/CSS/JS 中不存在任何外部 <script src>、CSS @import 或字体外链，全部资源同源自托管"
+  },
+  {
+   "id": "SC-02",
+   "level": "high",
+   "title": "目标域 apex 证书链无效",
+   "detail": "mssss.cn 返回自签证书，与 bili.mssss.cn 的 Let's Encrypt 证书不同源"
+  },
+  {
+   "id": "SC-03",
+   "level": "medium",
+   "title": "真实客服邮箱硬编码在页面",
+   "detail": "bilibiliup1@126.com 出现于 index.html FAQ 与页脚，属个人可识别信息"
+  },
+  {
+   "id": "SC-04",
+   "level": "medium",
+   "title": "登录页密码可逆地存在 localStorage",
+   "detail": "btoa(明文密码) 存入 bp_rem_p，任何 XSS 或本地访问即可还原"
+  },
+  {
+   "id": "SC-05",
+   "level": "medium",
+   "title": "管理后台路径靠 JS 隐藏",
+   "detail": "/admin234 只在前端判断 role==='admin'，服务端必须独立鉴权（本项目已用 require_admin 兜住）"
+  },
+  {
+   "id": "SC-06",
+   "level": "low",
+   "title": "Cookie 明文存放于服务端",
+   "detail": "前端文案称「加密存储」，前端无本地存储痕迹，实际由服务端决定；开源实现用 Fernet(派生自 SECRET_KEY)"
+  },
+  {
+   "id": "SC-07",
+   "level": "info",
+   "title": "计算验证码强度偏低",
+   "detail": "形如「9 - 6 = ?」的算式，单题穷举成本极低，仅靠频率限制生效"
+  }
+ ]
+}

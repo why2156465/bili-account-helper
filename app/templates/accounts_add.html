@@ -1,0 +1,421 @@
+{% extends "base.html" %}
+{% set nav = 'accounts' %}
+{% block title %}添加账号{% endblock %}
+
+{% block content %}
+<div class="page-head"><h1>添加账号</h1></div>
+
+<div class="card" style="margin-bottom:14px">
+  <div class="card-hd"><i class="dot"></i>IP 代理 <span class="hint" id="pxState" style="margin-left:8px"></span></div>
+  <div class="card-bd">
+    <div class="px-why" id="pxWhy">
+      <b>为什么要先挂一个 IP 代理？</b>
+      <ul>
+        <li><b>防异地登录风控</b>：B 站会把「突然换城市 / 换运营商登录」当成盗号，轻则弹验证码，重则限制投币、限流、禁言。给账号固定一个<b>和你同城（或最近城市）</b>的 IP，长期不变，最稳。</li>
+        <li><b>避免「投不了币 / 投稿失败」</b>：被风控标记的 IP，投币会报非法访问、投稿会失败——换回干净的同城 IP 就能恢复。</li>
+        <li><b>多账号不串号</b>：同一 IP 挂太多号容易被当成工作室。一个账号一个 IP，把风险摊开。</li>
+        <li><b>全程生效</b>：扫码 / 短信 / Cookie 导入都走这个 IP；账号添加成功后，以后所有操作也默认用它（随时可在账号卡片上改）。</li>
+      </ul>
+    </div>
+    <div class="field"><label>① 本次登录用哪个 IP</label>
+      <div class="seg" id="pxMode">
+        <button data-v="none" class="on">不用代理</button>
+        <button data-v="mine">我的代理</button>
+        <button data-v="manual">手动填写</button>
+      </div>
+    </div>
+    <div class="field" id="pxRowMine" style="display:none">
+      <label>从「我的代理列表」选一个</label><select id="pxSel"></select>
+    </div>
+    <div class="field" id="pxRowManual" style="display:none">
+      <label>代理地址</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input id="pxNew" placeholder="ip:端口 或 user:pass@ip:端口" style="flex:1;min-width:180px">
+        <button class="btn ghost sm" id="pxAddNew" type="button">＋ 加入我的代理列表</button>
+      </div>
+    </div>
+    <div class="field"><label>② 本次登录会从哪个 IP 出去（自动检测，不用手填）</label>
+      <div class="geo" id="pxGeo">
+        <span class="geo-dot"></span>
+        <b id="geoCity">检测中…</b>
+        <span class="geo-isp" id="geoIsp"></span>
+        <span class="geo-ip" id="geoIp"></span>
+        <button class="geo-re" id="geoRe" type="button">重新检测</button>
+      </div>
+      <p class="hint" id="geoTip" style="margin:7px 0 0"></p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn" id="pxConfirm" type="button">③ 确认对本次登录使用该代理</button>
+      <button class="btn ghost sm" id="pxTest" type="button">仅测试连通性</button>
+    </div>
+    <div class="hi" id="pxOut" style="display:none;margin-top:10px"></div>
+  </div>
+</div>
+
+<div class="tabs tabs-center">
+  <button id="t-qr" class="active" onclick="tab('qr')">扫码登录</button>
+  <button id="t-sms" onclick="tab('sms')">手机验证码</button>
+  <button id="t-ck" onclick="tab('ck')">Cookie 导入</button>
+</div>
+
+<div id="pane-qr" class="card">
+  <div class="qrwrap">
+    <div id="qr-wrap"><p class="hint">点击下方按钮生成登录二维码</p></div>
+    <div style="height:14px"></div>
+    <button class="btn" id="genBtn">生成二维码</button>
+    <p class="sub-note" id="qr-tip">用手机 B 站 App 扫一扫并确认登录</p>
+    <p class="hint" style="margin-top:8px">这一种是<b>网页扫码</b>：B 站会把它记成「网页设备」。想让 B 站把你记成<b>安卓设备</b>（和 App 一致），请改用「手机验证码」登录。</p>
+  </div>
+</div>
+
+<div id="pane-sms" class="card" style="display:none">
+  <div class="card-bd">
+    <p class="hint">用手机号 + 短信验证码直接登录并添加账号，验证码由 <b>B 站官方</b> 下发（同一个手机号 60 秒内只能获取一次）。</p>
+    <div class="sms-row">
+      <select id="smsCid">
+        <option value="86">+86 中国</option>
+        <option value="852">+852 香港</option>
+        <option value="853">+853 澳门</option>
+        <option value="886">+886 台湾</option>
+      </select>
+      <input id="smsTel" type="tel" inputmode="numeric" autocomplete="tel" placeholder="手机号">
+    </div>
+    <div class="sms-row2">
+      <input id="smsCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="短信验证码">
+      <button class="btn ghost" id="smsSendBtn">获取验证码</button>
+    </div>
+    <button class="btn" id="smsBtn">登录并添加账号</button>
+    <p class="sub-note" id="sms-tip">收不到短信？确认手机号无误，或稍后重试（B 站对发送频率有限制）</p>
+  </div>
+</div>
+
+<div id="pane-ck" class="card" style="display:none">
+  <div class="card-bd">
+    <div class="seg ck-seg" id="ckMode">
+      <button data-v="file" class="on" type="button">上传文件</button>
+      <button data-v="paste" type="button">粘贴文本</button>
+    </div>
+    <div id="ckp-file">
+      <div class="drop" id="drop">
+        <div class="big">点击选择文件，或把文件拖到这里</div>
+        <div class="hint">支持 biliup 的 cookies.json、ck_*.json、导出的 cookie 文本；<br>文件内含多个账号会自动批量导入</div>
+      </div>
+      <input type="file" id="file" accept=".json,.txt,.log" style="display:none">
+      <div id="file-result" style="margin-top:16px"></div>
+    </div>
+    <div id="ckp-paste" style="display:none">
+      <div class="field">
+        <label>Cookie 内容</label>
+        <textarea id="cktext" placeholder="SESSDATA=xxxxxx; bili_jct=xxxxxx; DedeUserID=xxxxxx"></textarea>
+      </div>
+      <div class="field"><label>备注（选填）</label><input id="cknote" placeholder="例如：小号 01"></div>
+      <button class="btn" id="ckBtn">导入并添加账号</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var PXLIST=[], GEOCITY='', PX_CONFIRMED=false, GEO_SEQ=0, PX_MODE='none';
+
+function tab(v){
+  ['qr','sms','ck'].forEach(function(k){
+    document.getElementById('t-'+k).classList.toggle('active', k===v);
+    document.getElementById('pane-'+k).style.display = (k===v?'':'none');
+  });
+}
+function geoPaint(cls, city, isp, ip){
+  var g=document.getElementById('pxGeo');
+  g.className='geo'+(cls?' '+cls:'');
+  document.getElementById('geoCity').textContent=city||'—';
+  document.getElementById('geoIsp').textContent=isp||'';
+  document.getElementById('geoIp').textContent=ip||'';
+}
+function pxUse(){
+  if(PX_MODE==='none') return '';
+  if(PX_MODE==='mine'){
+    var s=document.getElementById('pxSel');
+    return (s && s.value) ? (PXLIST.filter(function(p){return String(p.id)===s.value})[0]||{}).url||'' : '';
+  }
+  return (document.getElementById('pxNew').value||'').trim();
+}
+function readPxUrl(){
+  if(PX_MODE==='manual') return (document.getElementById('pxNew').value||'').trim();
+  if(PX_MODE==='mine'){ var v=document.getElementById('pxSel').value; return v?(PXLIST.filter(function(p){return String(p.id)===v})[0]||{}).url||'':''; }
+  return '';
+}
+function pxSetMode(v){
+  PX_MODE=v;
+  document.querySelectorAll('#pxMode button').forEach(function(b){ b.classList.toggle('on', b.dataset.v===v); });
+  document.getElementById('pxRowMine').style.display = v==='mine'?'':'none';
+  document.getElementById('pxRowManual').style.display = v==='manual'?'':'none';
+  PX_CONFIRMED=false;
+  document.getElementById('pxState').textContent='（未确认）';
+  geoDetect();
+}
+document.querySelectorAll('#pxMode button').forEach(function(b){ b.onclick=function(){ pxSetMode(b.dataset.v); }; });
+
+async function loadPx(){
+  try{ var d=await BP.api('/api/proxy/list'); PXLIST=d.proxies||[]; }catch(e){ PXLIST=[]; }
+  document.getElementById('pxSel').innerHTML = PXLIST.length
+    ? PXLIST.map(function(p){return '<option value="'+p.id+'">'+BP.esc(p.name||p.url)+'（'+BP.esc(p.url)+'）</option>'}).join('')
+    : '<option value="">（代理列表为空，请用「手动填写」）</option>';
+}
+
+async function geoDetect(){
+  var u=readPxUrl();
+  geoPaint('busy', u?'正在通过这条代理检测…':'正在检测服务器线路…','','');
+  var seq=++GEO_SEQ;
+  try{
+    var d=await BP.api('/api/proxy/geo'+(u?('?proxy='+encodeURIComponent(u)):''));
+    if(seq!==GEO_SEQ) return;
+    var ex=d.exit||{};
+    if(!ex.ok){
+      GEOCITY='';
+      geoPaint('bad', u?'这条代理不通':'检测失败','','');
+      document.getElementById('geoTip').textContent=(u?'❌ ':'')+(ex.error||'检测失败')+(u?' 换一条代理，或把①改成「不用代理」。':'');
+      return;
+    }
+    GEOCITY=ex.city||ex.province||'';
+    geoPaint('ok', BP.esc([ex.province,ex.city].filter(Boolean).join(' ')||'未知'), ex.isp||'', ex.ip||'');
+    document.getElementById('geoTip').textContent='本次登录将从这里出去（'+(ex.country||'')+' '+BP.esc([ex.province,ex.city].filter(Boolean).join(' ')||'未知')+'，IP '+(ex.ip||'')+'）。';
+    BP.api('/api/proxy/geo/me'+(ex.city?('?city='+encodeURIComponent(ex.city)):'')).then(function(m){
+      if(seq!==GEO_SEQ) return;
+      var me=m.me||{};
+      if(!me.ok||!(me.city||me.province)) return;
+      var mine=BP.esc(me.city||me.province), more='';
+      if(m.same_city===true){ more='<br>按你当前上网的 IP 看，你在 <b>'+mine+'</b>，和这条代理同城，比较稳。'; }
+      else if(m.same_city===false){ more='<br>按你当前上网的 IP 看，你在 <b>'+mine+'</b>，<b style="color:#e8590c">和代理不同城</b>，更容易触发异地风控。'; }
+      document.getElementById('geoTip').innerHTML+=more;
+    }).catch(function(){});
+  }catch(e){
+    if(seq!==GEO_SEQ) return;
+    geoPaint('bad','检测失败','','');
+    document.getElementById('geoTip').textContent='❌ '+e.message;
+  }
+}
+document.getElementById('geoRe').onclick=geoDetect;
+
+document.getElementById('pxTest').onclick=async function(){
+  var u=readPxUrl();
+  var o=document.getElementById('pxOut'); o.style.display='';
+  if(!u){ o.innerHTML='请先选择或填写代理'; return; }
+  o.innerHTML='测试中…';
+  try{
+    var r=await BP.api('/api/proxy/test',{method:'POST',body:JSON.stringify({url:u})});
+    o.innerHTML=r.ok?('✅ 通！出口 IP：'+(r.ip||'—')+'（'+(r.ms||0)+' ms）'):('❌ 不通：'+(r.error||''));
+  }catch(e){ o.innerHTML='❌ '+e.message; }
+};
+
+document.getElementById('pxConfirm').onclick=async function(){
+  var b=this, o=document.getElementById('pxOut'); o.style.display='';
+  var u=readPxUrl();
+  if(PX_MODE==='none'){
+    PX_CONFIRMED=true;
+    o.innerHTML='已选择「不用代理」：本次登录按平台默认线路走。';
+    document.getElementById('pxState').textContent='（已确认：不用代理）';
+    return;
+  }
+  if(!u){ o.innerHTML='请先选择或填写代理'; return; }
+  b.disabled=true; o.innerHTML='正在验证代理是否能用…';
+  try{
+    var r=await BP.api('/api/proxy/test',{method:'POST',body:JSON.stringify({url:u})});
+    if(!r.ok){
+      o.innerHTML='❌ 这个代理不通：'+(r.error||'')+'<br>换个地址，或点①改成「不用代理」。';
+      PX_CONFIRMED=false;
+    }else{
+      PX_CONFIRMED=true;
+      o.innerHTML='✅ 已确认。出口 IP <b>'+(r.ip||'—')+'</b>（'+(r.ms||0)+' ms）。<br>接下来扫码 / 短信 / 导入 Cookie 全程都走这个 IP，账号添加后也会沿用。';
+      document.getElementById('pxState').textContent='（已确认）';
+    }
+  }catch(e){ o.innerHTML='❌ '+e.message; }
+  b.disabled=false;
+};
+
+document.getElementById('pxAddNew').onclick=async function(){
+  var u=document.getElementById('pxNew').value.trim();
+  if(!u){ BP.toast('请先填写代理地址','err'); return; }
+  var city=(GEOCITY||'');
+  try{
+    await BP.api('/api/proxy',{method:'POST',body:JSON.stringify({
+      url:u, name:(city?city+' ':'')+u.slice(0,24)})});
+    await loadPx();
+    var hit=PXLIST.filter(function(p){return p.url===u})[0];
+    if(hit){ document.getElementById('pxSel').value=hit.id; pxSetMode('mine'); }
+    BP.toast('已加入「我的代理列表」');
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+
+/* ---------- 扫码 ---------- */
+var poll=null;
+document.getElementById('genBtn').onclick=async function(){
+  var b=this; b.disabled=true;
+  var px=pxUse();
+  if(PX_MODE!=='none' && px===null){ b.disabled=false; return; }
+  try{
+    var d=await BP.api('/api/accounts/qr',{method:'POST',body:JSON.stringify({proxy:px||''})});
+    if(d.qr){
+    document.getElementById('qr-wrap').innerHTML=
+      '<img src="'+d.qr+'" style="max-width:200px;display:block" alt="登录二维码">';
+  }else{
+    document.getElementById('qr-wrap').innerHTML=
+      '<p class="hint">二维码生成失败，请刷新重试</p>';
+  }
+    document.getElementById('qr-tip').textContent='请用手机 B 站 App 扫码并确认…';
+    clearInterval(poll);
+    poll=setInterval(async function(){
+      try{
+        var r=await BP.api('/api/accounts/qr/'+encodeURIComponent(d.sid)+(px?('?proxy='+encodeURIComponent(px)):''));
+        if(r.status==='ok'){
+          clearInterval(poll);
+          BP.toast('添加成功：'+r.account.uname);
+          setTimeout(function(){ location.href='/accounts'; },900);
+        }else if(r.status==='scanning'){
+          document.getElementById('qr-tip').textContent='已扫码，请在手机上点击确认…';
+        }
+      }catch(e){}
+    }, 2000);
+  }catch(e){ BP.toast(e.message,'err'); }
+  b.disabled=false;
+};
+
+/* ---------- 手机验证码 ---------- */
+/* B站 发短信前要过极验：先拿 gt/challenge，跑滑块拿 validate+seccode，再发。
+   没有这些参数 B站 一律返回 -105「验证码错误」。 */
+var smsCap='', smsBuid=null, GT_LOADING=null;
+
+function loadGeetest(){
+  if(window.initGeetest4) return Promise.resolve();
+  if(GT_LOADING) return GT_LOADING;
+  GT_LOADING=new Promise(function(res, rej){
+    var s=document.createElement('script');
+    s.src='https://static.geetest.com/v4/gt4.js';
+    s.onload=function(){ res(); };
+    s.onerror=function(){ rej(new Error('极验脚本加载失败（可能被网络或插件拦截）')); };
+    document.head.appendChild(s);
+    setTimeout(function(){ if(!window.initGeetest4) rej(new Error('极验脚本加载超时')); }, 12000);
+  });
+  return GT_LOADING;
+}
+
+async function runGeetest(cap){
+  await loadGeetest();
+  return new Promise(function(res, rej){
+    initGeetest4({captchaId: cap.gt, product:'bind'}, function(gt){
+      gt.onSuccess(function(){
+        var r=gt.getValidate()||{};
+        res({validate: r.lot_number || '', seccode: (r.captcha_output||'')+'|'+(r.pass_token||'')+'|'+(r.gen_time||'')});
+      });
+      gt.onError(function(){ rej(new Error('滑块验证失败，请重试')); });
+      gt.onClose(function(){ rej(new Error('已取消滑块验证')); });
+      gt.showBox();
+    });
+  });
+}
+
+document.getElementById('smsSendBtn').onclick=async function(){
+  var b=this, tel=document.getElementById('smsTel').value.trim();
+  if(tel.length<6){ BP.toast('请输入正确的手机号','err'); return; }
+  var px=pxUse(); b.disabled=true;
+  var tip=document.getElementById('sms-tip');
+  try{
+    tip.textContent='正在获取验证参数…';
+    var cap=await BP.api('/api/accounts/sms/captcha');
+    var parts={};
+    if(cap.type==='geetest' && cap.gt){
+      tip.textContent='请完成滑块验证…';
+      parts=await runGeetest(cap);
+      tip.textContent='正在发送短信…';
+    }
+    var d=await BP.api('/api/accounts/sms/send',{method:'POST',body:JSON.stringify({
+      tel:tel, cid:document.getElementById('smsCid').value, proxy:px||'',
+      token:cap.token||'', challenge:cap.challenge||'',
+      geetest_validate:parts.validate||'', seccode:parts.seccode||''})});
+    smsCap=d.captcha_key||'';
+    smsBuid={buvid3:d.buvid3||'', buvid4:d.buvid4||''};
+    tip.textContent='验证码已发送到 '+tel+'，请查看短信'+(d.is_new?'（该手机号在 B 站尚未注册）':'');
+    BP.cd(b,60,'获取验证码');
+  }catch(e){
+    tip.textContent='';
+    BP.toast(e.message,'err');
+    b.disabled=false;
+  }
+};
+document.getElementById('smsBtn').onclick=async function(){
+  var b=this, tel=document.getElementById('smsTel').value.trim();
+  var px=pxUse(); b.disabled=true;
+  try{
+    var r=await BP.api('/api/accounts/sms/login',{method:'POST',body:JSON.stringify({
+      tel:tel, cid:document.getElementById('smsCid').value,
+      code:document.getElementById('smsCode').value.trim(),
+      captcha_key:smsCap, buvid3:(smsBuid&&smsBuid.buvid3)||'', proxy:px||''})});
+    BP.toast('添加成功：'+r.account.uname);
+    setTimeout(function(){ location.href='/accounts'; },900);
+  }catch(e){
+    BP.toast(e.message,'err');
+    document.getElementById('sms-tip').textContent='登录失败：'+e.message;
+    b.disabled=false;
+  }
+};
+
+/* ---------- Cookie 导入 ---------- */
+document.querySelectorAll('#ckMode button').forEach(function(x){
+  x.onclick=function(){
+    document.querySelectorAll('#ckMode button').forEach(function(y){y.classList.toggle('on',y===x)});
+    var file=x.dataset.v==='file';
+    document.getElementById('ckp-file').style.display=file?'':'none';
+    document.getElementById('ckp-paste').style.display=file?'none':'';
+  };
+});
+var drop=document.getElementById('drop');
+drop.onclick=function(){ document.getElementById('file').click(); };
+drop.ondragover=function(e){ e.preventDefault(); };
+drop.ondrop=function(e){
+  e.preventDefault();
+  if(e.dataTransfer.files.length) uploadCkFile(e.dataTransfer.files[0]);
+};
+document.getElementById('file').onchange=function(){ if(this.files[0]) uploadCkFile(this.files[0]); };
+
+async function uploadCkFile(f){
+  var px=pxUse();
+  var box=document.getElementById('file-result');
+  if(PX_MODE!=='none' && !PX_CONFIRMED){
+    box.innerHTML='<p class="hint">请先点上方「③ 确认对本次登录使用该代理」（或改成「不用代理」）。</p>';
+    return;
+  }
+  var fd=new FormData(); fd.append('file',f); fd.append('proxy',px||'');
+  box.innerHTML='<p class="hint">正在导入并逐个探活…</p>';
+  try{
+    var res=await fetch('/api/accounts/ckfile',{method:'POST',body:fd,credentials:'same-origin'});
+    var r=await res.json();
+    if(!res.ok) throw new Error(r.detail||'导入失败');
+    box.innerHTML='<div class="tbl-scroll"><table><thead><tr><th>昵称</th><th>UID</th><th>硬币</th><th>状态</th><th>投币</th></tr></thead><tbody>'
+      + r.results.map(function(x){
+          return x.ok
+            ? '<tr><td>'+BP.esc(x.uname)+'</td><td class="mono">'+BP.esc(x.mid)+'</td><td>'+x.coins+'</td>'
+              +'<td><span class="tag ok">可用</span></td>'
+              +'<td>'+(x.coin_ok?'<span class="tag ok">可投币</span>':'<span class="tag warn">需重扫码投币</span>')+'</td></tr>'
+            : '<tr><td colspan="5"><span class="tag err">失败</span> '+BP.esc(x.error||'')+'</td></tr>';
+        }).join('')+'</tbody></table></div>';
+    var okN=r.results.filter(function(x){return x.ok}).length;
+    if(okN){ BP.toast('导入成功 '+okN+' 个'); setTimeout(function(){ location.href='/accounts'; },1200); }
+  }catch(e){ box.innerHTML='<p class="hint">'+BP.esc(e.message)+'</p>'; }
+}
+
+document.getElementById('ckBtn').onclick=async function(){
+  var ck=document.getElementById('cktext').value.trim();
+  if(!ck){ BP.toast('请粘贴 Cookie','err'); return; }
+  var px=pxUse();
+  try{
+    var r=await BP.api('/api/accounts/ck',{method:'POST',body:JSON.stringify({
+      ck:ck, note:document.getElementById('cknote').value.trim(), proxy:px||''})});
+    BP.toast('导入成功：'+r.account.uname);
+    setTimeout(function(){ location.href='/accounts'; },900);
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+
+loadPx();
+geoDetect();
+</script>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% set nav = 'notices' %}
+{% block title %}通知{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <span class="nt-brand">🔔</span>
+  <h1>消息通知 <span class="hint" id="un-read"></span></h1>
+  <span class="spacer"></span>
+  <button class="btn ghost sm" id="all-read">全部标为已读</button>
+</div>
+
+<div class="card">
+  <div class="nt-list" id="rows"><div class="empty">加载中…</div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadNotices(){
+  try{
+    var d=await BP.api('/api/notices');
+    var list=d.items||[];
+    var un=list.filter(function(x){return !x.read}).length;
+    document.getElementById('un-read').textContent=un?('（'+un+' 条未读）'):'';
+    document.getElementById('rows').innerHTML=list.length?list.map(function(n){
+      return '<div class="nt-it'+(n.read?'':' nt-unread')+'" data-id="'+n.id+'">'
+        +'<div class="nt-top"><b class="nt-t">'+BP.esc(n.title||'通知')+'</b>'
+        +'<span class="hint nt-time">'+BP.esc(new Date((n.created_at||0)*1000).toLocaleString('zh-CN'))+'</span></div>'
+        +'<div class="nt-b">'+BP.esc(n.body||'').replace(/\n/g,'<br>')+'</div>'
+        +'</div>';
+    }).join(''):'<div class="empty">还没有通知</div>';
+    document.querySelectorAll('.nt-it').forEach(function(el){
+      el.onclick=async function(){
+        var id=el.getAttribute('data-id');
+        if(el.classList.contains('nt-unread')){
+          el.classList.remove('nt-unread');
+          try{ await BP.api('/api/notices/read',{method:'POST',body:JSON.stringify({id:parseInt(id)})}); }catch(e){}
+          loadNotices();
+        }
+      };
+    });
+  }catch(e){
+    document.getElementById('rows').innerHTML='<div class="empty">'+BP.esc(e.message)+'</div>';
+  }
+}
+document.getElementById('all-read').onclick=async function(){
+  try{ await BP.api('/api/notices/read',{method:'POST',body:JSON.stringify({})}); loadNotices(); BP.toast('已全部标为已读'); }
+  catch(e){ BP.toast(e.message,'err'); }
+};
+loadNotices();
+</script>
+{% endblock %}

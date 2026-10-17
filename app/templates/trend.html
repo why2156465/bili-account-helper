@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}趋势{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1 class="ph-title">账号趋势</h1>
+  <span class="ph-sub">每个账号近期的播放量 / 点赞 / 涨粉变化</span>
+  <div class="spacer"></div>
+  <a class="btn ghost sm" href="/dashboard">← 返回总览</a>
+</div>
+
+<div class="tr-tabs" id="trDays">
+  <span class="chip on" data-d="7">近 7 天</span>
+  <span class="chip" data-d="14">近 14 天</span>
+  <span class="chip" data-d="30">近 30 天</span>
+</div>
+
+<div class="hi" id="trNote" style="margin-top:12px">
+  每天 10:00 自动体检时记录一次数据（点账号「体检」也会补记）。曲线是<b>当天比上一条快照新增的量</b>，累计值显示在卡片右上角。凑够两天数据才会出现曲线。
+</div>
+
+<div id="trList" style="margin-top:14px"><p class="hint">加载中…</p></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+var D={};
+var TRC={play:'#00aeec',like:'#fb7299',fans:'#52c41a'};
+var TRN={play:'播放量',like:'点赞',fans:'涨粉'};
+
+function accCard(acc,dates){
+  var v=acc.series||{};
+  var sum=function(k){return (v[k]||[]).reduce(function(a,b){return a+(b||0)},0)};
+  var legend=['play','like','fans'].map(function(k){
+    var inc=sum(k);
+    return '<span class="tri"><i style="background:'+TRC[k]+'"></i>'+TRN[k]
+      +'<b>'+fmtN(acc[k==='play'?'views':(k==='like'?'likes':'fans')]||0)+'</b>'
+      +'<em>'+(inc>0?('近 '+dates.length+' 天 +'+fmtN(inc)):('近 '+dates.length+' 天 '+(inc<0?fmtN(inc):'0')))+'</em></span>';
+  }).join('');
+  var st=acc.status==='ok'?'<span class="tag ok">正常</span>':'<span class="tag err">失效</span>';
+  var av=acc.face
+    ? ('<img src="/api/img/proxy?u='+encodeURIComponent(acc.face)+'" referrerpolicy="no-referrer" alt="" onerror="this.style.opacity=0">')
+    : ('<span class="na">'+esc((acc.name||'?').slice(0,1))+'</span>');
+  return '<div class="card tr-card" data-id="'+acc.id+'">'
+    +'<div class="card-hd"><span class="tr-av">'+av+'</span>'
+    +'<span class="tr-nm" title="'+esc(acc.name)+'">'+esc(acc.name||('UID '+acc.mid))+'</span>'
+    +'<span class="tr-mid">UID '+esc(maskMid(acc.mid))+'</span>'+st
+    +'<span class="spacer"></span>'
+    +'<span class="tr-sub">粉丝 '+fmtN(acc.fans)+' · 稿件 '+fmtN(acc.videos)+'</span></div>'
+    +'<div class="card-bd"><div class="tr-lg">'+legend+'</div>'
+    +'<div class="tr-box" data-acc="'+acc.id+'"><span class="hint">…</span></div></div></div>';
+}
+
+function drawOne(box,acc,dates){
+  var W=Math.max(240,box.clientWidth||700);
+  var H=Math.max(96,Math.min(150,Math.round(W*0.2)));
+  var P=12,n=dates.length,v=acc.series||{};
+  var xs=[];
+  for(var i=0;i<n;i++) xs.push(n<2?W/2:P+i*(W-2*P)/(n-1));
+  var mx=0;
+  ['play','like','fans'].forEach(function(k){
+    (v[k]||[]).forEach(function(x){ mx=Math.max(mx,Math.abs(x||0)); });
+  });
+  var svg='';
+  if(n>=2&&mx>0){
+    for(var g=0;g<=2;g++){
+      var gy=Math.round(H-P-g*(H-2*P)/2);
+      svg+='<line x1="0" y1="'+gy+'" x2="'+W+'" y2="'+gy+'" stroke="#eef1f5" stroke-width="1"/>';
+    }
+    ['play','like','fans'].forEach(function(k){
+      var arr=v[k]||[],m2=0;
+      arr.forEach(function(x){ m2=Math.max(m2,Math.abs(x||0)); });
+      var poly='',dots='';
+      for(var i=0;i<n;i++){
+        var val=arr[i]||0;
+        var y=m2>0?(H-P-(Math.max(0,val)/m2)*(H-2*P)):(H-P);
+        poly+=(i?' ':'')+xs[i].toFixed(1)+','+y.toFixed(1);
+        dots+='<circle cx="'+xs[i].toFixed(1)+'" cy="'+y.toFixed(1)+'" r="2.3" fill="#fff" stroke="'+TRC[k]+'" stroke-width="2"/>';
+      }
+      svg+='<polyline fill="none" stroke="'+TRC[k]+'" stroke-width="2" stroke-linejoin="round" '
+        +'stroke-linecap="round" points="'+poly+'"/>'+dots;
+    });
+  }
+  var step=n>10?Math.ceil(n/7):1;
+  var xlabels='';
+  for(var i=0;i<n;i+=step){
+    xlabels+='<span style="left:'+(xs[i]/W*100).toFixed(2)+'%">'+esc(dates[i])+'</span>';
+  }
+  box.innerHTML='<svg class="tr-svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+svg+'</svg>'
+    +(mx>0?'':'<div class="tr-empty">今天已记下数据点，凑够两天就能看到曲线（每天 10:00 自动记录；点账号「体检」也会记一次）</div>')
+    +'<div class="tr-x">'+xlabels+'</div>';
+}
+
+function render(){
+  var box=document.getElementById('trList');
+  var accs=D.accounts||[],dates=D.dates||[];
+  if(!accs.length){
+    box.innerHTML='<div class="card"><div class="card-bd"><p class="hint">还没有账号，去 '
+      +'<a href="/accounts/add">添加账号</a> 后再看趋势。</p></div></div>';
+    return;
+  }
+  box.innerHTML=accs.map(function(a){return accCard(a,dates)}).join('');
+  accs.forEach(function(a){
+    var el=box.querySelector('.tr-box[data-acc="'+a.id+'"]');
+    if(el) drawOne(el,a,dates);
+  });
+}
+
+async function load(days){
+  try{ D=await BP.api('/api/trend?days='+days); }
+  catch(e){ document.getElementById('trList').innerHTML='<p class="hint">'+esc(e.message)+'</p>'; return; }
+  render();
+}
+
+(function(){
+  var wrap=document.getElementById('trDays');
+  wrap.querySelectorAll('.chip').forEach(function(c){
+    c.onclick=function(){
+      wrap.querySelectorAll('.chip').forEach(function(x){ x.classList.remove('on'); });
+      c.classList.add('on');
+      load(parseInt(c.getAttribute('data-d')||'7',10));
+    };
+  });
+  load(7);
+})();
+
+window.addEventListener('resize',function(){ if(D.accounts) render(); });
+</script>
+{% endblock %}

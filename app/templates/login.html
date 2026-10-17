@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>登录 · {{ APP_NAME }}</title>
+<link rel="icon" href="/static/img/nodata.png">
+<link rel="stylesheet" href="/static/css/app.css?v={{ CSS_V }}">
+<link rel="stylesheet" href="/static/css/client.css?v={{ CSS_V }}">
+</head>
+<body>
+<div class="auth">
+  <div class="box">
+    <a class="logo" href="/" style="text-decoration:none"><img src="/static/img/bili_logo.svg" alt="哔哩哔哩"><b style="font-size:16px">{{ APP_NAME }}</b></a>
+    <div class="card">
+      <!-- 1. 登录 -->
+      <div id="loginBox">
+        <h2 style="margin:0 0 3px;font-size:17px">登录</h2>
+        <p class="hint" style="margin:0 0 18px">管理你的 B 站账号与互赞任务</p>
+        <form id="lf" autocomplete="on" novalidate>
+          <div class="field"><label>用户名 / 邮箱</label><input id="u" name="username" type="text" autocomplete="username" placeholder="用户名或注册邮箱"></div>
+          <div class="field"><label>密码</label><input id="p" name="password" type="password" autocomplete="current-password" placeholder="请输入密码"></div>
+          <div class="field" id="capRow">
+            <label>计算验证码</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span id="capq" style="font-weight:700;font-size:15px;min-width:88px">…</span>
+              <input id="cap" name="captcha" type="text" inputmode="numeric" autocomplete="off" placeholder="填答案" style="flex:1">
+              <button class="btn ghost" id="capre" type="button" style="white-space:nowrap">换一题</button>
+            </div>
+          </div>
+          <label class="remember"><input type="checkbox" id="remember" checked> 记住密码（下次自动填入）</label>
+          <button class="btn wide" id="go" type="submit">登录</button>
+        </form>
+        <div style="text-align:right;margin-top:10px">
+          <a href="#" id="toForgot" style="font-size:13px;color:#3b82f6;text-decoration:none">忘记密码？</a>
+        </div>
+      </div>
+
+      <!-- 2. 异地登录邮箱验证 -->
+      <div id="verifyBox" style="display:none">
+        <h2 style="margin:0 0 3px;font-size:17px">邮箱安全验证</h2>
+        <p class="hint" style="margin:0 0 14px">检测到新 IP 登录，需要验证 <b id="vmail"></b>。请先算出下方验证码，再点「发送验证码」；验证通过后该 IP 会被记住。</p>
+        <div class="field">
+          <label>计算验证码 <span style="color:#b6bdc8">（发送邮件前填写）</span></label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span id="vcapq" style="font-weight:700;font-size:15px;min-width:88px">…</span>
+            <input id="vcap" type="text" inputmode="numeric" placeholder="填答案" style="flex:1">
+            <button class="btn ghost" id="vcapre" type="button" style="white-space:nowrap">换一题</button>
+          </div>
+        </div>
+        <button class="btn wide" id="vresend" type="button">发送验证码到邮箱</button>
+        <div class="field" style="margin-top:14px">
+          <label>邮箱验证码</label>
+          <input id="vcode" type="text" inputmode="numeric" maxlength="6" placeholder="收到邮件后填入 6 位验证码">
+        </div>
+        <button class="btn wide" id="vgo">验证并登录</button>
+        <div style="text-align:right;margin-top:10px">
+          <a href="#" id="vback" style="font-size:13px;color:#8a94a6;text-decoration:none">返回登录</a>
+        </div>
+      </div>
+
+      <!-- 3. 忘记密码 -->
+      <div id="resetBox" style="display:none">
+        <h2 style="margin:0 0 3px;font-size:17px">找回密码</h2>
+        <p class="hint" style="margin:0 0 16px">填写注册邮箱，收验证码后重设密码</p>
+        <div class="field"><label>注册邮箱</label><input id="r-em" type="email" autocomplete="email" placeholder="you@example.com"></div>
+        <div class="field">
+          <label>计算验证码 <span style="color:#b6bdc8">（获取邮箱验证码前填写）</span></label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span id="rcapq" style="font-weight:700;font-size:15px;min-width:88px">…</span>
+            <input id="rcap" type="text" inputmode="numeric" placeholder="填答案" style="flex:1">
+            <button class="btn ghost" id="rcapre" type="button" style="white-space:nowrap">换一题</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>邮箱验证码</label>
+          <div style="display:flex;gap:8px">
+            <input id="rcode" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码" style="flex:1">
+            <button class="btn ghost" id="rsend" type="button" style="white-space:nowrap">获取验证码</button>
+          </div>
+        </div>
+        <div class="field"><label>新密码</label><input id="rp" type="password" autocomplete="new-password" maxlength="20" placeholder="8-20 位，且包含字母"></div>
+        <div class="field"><label>确认新密码</label><input id="rp2" type="password" autocomplete="new-password" maxlength="20" placeholder="再输入一次"></div>
+        <button class="btn wide" id="rgo">重置密码</button>
+        <div style="text-align:right;margin-top:10px">
+          <a href="#" id="rback" style="font-size:13px;color:#8a94a6;text-decoration:none">返回登录</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot">还没有账号？<a href="/register">立即注册</a> · <a href="/">返回首页</a></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/static/js/common.js"></script>
+<script>
+var CAPTOK='', TICKET='', VCAPTOK='', RCAPTOK='', NEEDCAP=true;
+const toast = BP.toast, api = BP.api;
+
+function show(id){
+  ['loginBox','verifyBox','resetBox'].forEach(function(k){document.getElementById(k).style.display=(k===id?'':'none');});
+}
+
+/* ---- 计算验证码 ---- */
+async function initCap(){
+  try{ var d=await api('/api/auth/captcha/needed'); NEEDCAP=!!(d&&d.need); }catch(e){ NEEDCAP=true; }
+  document.getElementById('capRow').style.display = NEEDCAP?'':'none';
+  if(NEEDCAP){ loadCap(''); } else { CAPTOK=''; }
+}
+async function loadCap(which){
+  try{
+    var d=await api('/api/auth/captcha');
+    if(which==='v'){ VCAPTOK=d.token; document.getElementById('vcapq').textContent=d.q; document.getElementById('vcap').value=''; }
+    else if(which==='r'){ RCAPTOK=d.token; document.getElementById('rcapq').textContent=d.q; document.getElementById('rcap').value=''; }
+    else { CAPTOK=d.token; document.getElementById('capq').textContent=d.q; document.getElementById('cap').value=''; }
+  }catch(e){}
+}
+document.getElementById('capre').onclick=function(){loadCap('')};
+document.getElementById('vcapre').onclick=function(){loadCap('v')};
+document.getElementById('rcapre').onclick=function(){loadCap('r')};
+
+/* ---- 记住密码（本地 base64，与站点行为一致）---- */
+const RK_U='bp_rem_u', RK_P='bp_rem_p';
+function b64e(s){try{return btoa(unescape(encodeURIComponent(s)))}catch(e){return ''}}
+function b64d(s){try{return decodeURIComponent(escape(atob(s)))}catch(e){return ''}}
+function restoreRemember(){
+  try{
+    var u=localStorage.getItem(RK_U), p=localStorage.getItem(RK_P);
+    if(u){document.getElementById('u').value=u;}
+    if(p){document.getElementById('p').value=b64d(p);}
+    document.getElementById('remember').checked=true;
+  }catch(e){}
+}
+function saveRemember(u,p){
+  try{
+    if(document.getElementById('remember').checked){localStorage.setItem(RK_U,u);localStorage.setItem(RK_P,b64e(p));}
+    else{localStorage.removeItem(RK_U);localStorage.removeItem(RK_P);}
+  }catch(e){}
+}
+
+/* ---- 登录 ---- */
+async function doLogin(){
+  var b=document.getElementById('go'); b.disabled=true;
+  var un=document.getElementById('u').value.trim(), pw=document.getElementById('p').value;
+  try{
+    var r=await api('/api/auth/login',{method:'POST',body:JSON.stringify({
+      username:un,password:pw,
+      captcha:document.getElementById('cap').value.trim(),
+      captcha_token:CAPTOK})});
+    if(r.need_verify){
+      TICKET=r.ticket;
+      document.getElementById('vmail').textContent=r.email||'你的邮箱';
+      show('verifyBox'); loadCap('v');
+      toast(r.message||'请点击「发送验证码」获取邮箱验证码');
+      b.disabled=false;
+      return;
+    }
+    saveRemember(un,pw);
+    location.href = (r.role==='admin') ? '/{{ ADMIN_PATH }}' : '/dashboard';
+  }catch(e){ toast(e.message); b.disabled=false; if(NEEDCAP){loadCap('');} }
+}
+document.getElementById('lf').addEventListener('submit',function(e){e.preventDefault();doLogin();});
+
+/* ---- 异地登录验证 ---- */
+async function doVerify(){
+  var b=document.getElementById('vgo'); b.disabled=true;
+  try{
+    var r=await api('/api/auth/login_verify',{method:'POST',body:JSON.stringify({
+      ticket:TICKET, code:document.getElementById('vcode').value.trim()})});
+    location.href = (r.role==='admin') ? '/{{ ADMIN_PATH }}' : '/dashboard';
+  }catch(e){ toast(e.message); b.disabled=false; }
+}
+document.getElementById('vgo').onclick=doVerify;
+document.getElementById('vresend').onclick=async function(e){
+  e.preventDefault();
+  var b=this, cap=document.getElementById('vcap').value.trim();
+  if(!cap){ toast('请先算出计算验证码'); document.getElementById('vcap').focus(); return; }
+  b.disabled=true;
+  try{
+    var r=await api('/api/auth/login_verify/resend',{method:'POST',body:JSON.stringify({
+      ticket:TICKET, captcha:cap, captcha_token:VCAPTOK})});
+    toast(r.message||('验证码已发送到 '+(r.email||'你的邮箱')));
+    BP.cd(b,60,'发送验证码到邮箱');
+  }catch(x){ toast(x.message); b.disabled=false; }
+  loadCap('v');
+};
+document.getElementById('vback').onclick=function(e){
+  e.preventDefault(); show('loginBox'); document.getElementById('go').disabled=false;
+  if(NEEDCAP){loadCap('');}
+};
+
+/* ---- 忘记密码 ---- */
+document.getElementById('toForgot').onclick=function(e){ e.preventDefault(); show('resetBox'); loadCap('r'); };
+document.getElementById('rback').onclick=function(e){ e.preventDefault(); show('loginBox'); document.getElementById('go').disabled=false; };
+document.getElementById('rsend').onclick=async function(){
+  var b=this, em=document.getElementById('r-em').value.trim(), cap=document.getElementById('rcap').value.trim();
+  if(!em){ toast('请先填写注册邮箱'); return; }
+  if(!cap){ toast('请先算出上方计算验证码'); document.getElementById('rcap').focus(); return; }
+  b.disabled=true;
+  try{
+    var r=await api('/api/auth/forgot',{method:'POST',body:JSON.stringify({
+      email:em, scene:'reset', captcha:cap, captcha_token:RCAPTOK})});
+    toast(r.message||'验证码已发送');
+    BP.cd(b,60,'获取验证码');
+    loadCap('r');
+  }catch(e){ toast(e.message); b.disabled=false; loadCap('r'); }
+};
+document.getElementById('rgo').onclick=async function(){
+  var b=this;
+  var em=document.getElementById('r-em').value.trim(), code=document.getElementById('rcode').value.trim();
+  var p=document.getElementById('rp').value, p2=document.getElementById('rp2').value;
+  if(!em||!code){ toast('请填写邮箱和验证码'); return; }
+  if(p!==p2){ toast('两次输入的密码不一致'); return; }
+  if(p.length<8){ toast('新密码至少 8 位'); return; }
+  if(p.length>20){ toast('新密码最多 20 位'); return; }
+  if(!/[A-Za-z]/.test(p)){ toast('新密码必须至少包含一个字母'); return; }
+  b.disabled=true;
+  try{
+    await api('/api/auth/reset',{method:'POST',body:JSON.stringify({email:em,code:code,password:p})});
+    toast('密码已重置，请用新密码登录');
+    document.getElementById('p').value='';
+    show('loginBox'); b.disabled=false;
+    document.getElementById('u').value=em;
+    if(NEEDCAP){loadCap('');}
+  }catch(e){ toast(e.message); b.disabled=false; }
+};
+
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Enter')return;
+  if(document.getElementById('verifyBox').style.display!=='none'){ e.preventDefault(); doVerify(); }
+  else if(document.getElementById('resetBox').style.display!=='none'){ e.preventDefault(); document.getElementById('rgo').click(); }
+});
+restoreRemember();
+initCap();
+</script>
+</body>
+</html>

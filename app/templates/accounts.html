@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+{% set nav = 'accounts' %}
+{% block title %}账号{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>我的账号 <span class="hint" id="cnt"></span></h1>
+  <div class="spacer"></div>
+  <a class="btn sm" href="/accounts/add">＋ 添加账号</a>
+</div>
+
+<div class="searchbar">
+  <span class="s-ic">🔍</span>
+  <input id="q" type="search" placeholder="搜索名字或 UID 数字" autocomplete="off" enterkeyhint="search">
+  <button class="clr" id="qclr" type="button" aria-label="清空">✕</button>
+</div>
+
+<div id="list"><div class="empty">加载中…</div></div>
+<div class="clp-more" id="listMore"></div>
+
+<!-- B 站登录记录弹窗 -->
+<div class="modal-mask" id="lgModal">
+  <div class="modal" style="max-width:560px">
+    <div class="hd">B 站登录记录 · <span id="lgAcc" style="font-weight:600"></span><span class="x" onclick="closeLg()">×</span></div>
+    <div class="bd">
+      <p class="hint">这是 B 站自己记录的登录 IP / 地点 / 时间。加了账号或重新登录后，这里应该只有你给这个号设置的代理 IP；如果出现服务器所在地或陌生地点，说明那个号没走代理。</p>
+      <div class="field"><label>该号当前代理</label><div class="mono" id="lgCur" style="word-break:break-all">—</div></div>
+      <div id="lgList"><p class="hint">加载中…</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- IP 代理弹窗 -->
+<div class="modal-mask" id="pxModal">
+  <div class="modal" style="max-width:600px">
+    <div class="hd">IP 代理 · <span id="pxAcc" style="font-weight:600"></span><span class="x" onclick="closePx()">×</span></div>
+    <div class="bd">
+      <p class="hint">给这个账号单独指定出口 IP。账号专属代理<b>优先级最高</b>，不受平台全局策略影响；不设置则跟随平台策略。</p>
+      <div class="field"><label>当前生效</label><div class="mono" id="pxCur" style="word-break:break-all">—</div></div>
+      <div class="field"><label>选择方式</label>
+        <div class="seg" id="pxMode">
+          <button data-v="none" class="on">跟随平台策略</button>
+          <button data-v="mine">用我的代理</button>
+          <button data-v="manual">手动填写</button>
+        </div>
+      </div>
+      <div class="field" id="pxRowMine" style="display:none"><label>从我的代理列表选择</label><select id="pxSel"></select></div>
+      <div class="field" id="pxRowManual" style="display:none"><label>代理地址</label>
+        <input id="pxUrl" placeholder="ip:port 或 user:pass@ip:port 或 socks5://ip:port"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="pxSave">保存到该账号</button>
+        <button class="btn ghost" id="pxTest">测试当前填写</button>
+        <button class="btn ghost" id="pxVerify">验证该号真实出口IP</button>
+      </div>
+      <div class="hint" id="pxTestOut" style="margin-top:8px"></div>
+      <div class="hint" id="pxVerifyOut" style="margin-top:6px"></div>
+      <hr style="border:0;border-top:1px dashed #e6e8ec;margin:16px 0">
+      <p class="sub">我的代理列表</p>
+      <div id="pxList"><p class="hint">加载中…</p></div>
+      <div class="grid2" style="margin-top:8px">
+        <div class="field"><label>名称（选填）</label><input id="pxNewName" placeholder="如：香港01"></div>
+        <div class="field"><label>地址</label><input id="pxNewUrl" placeholder="1.2.3.4:8888"></div>
+      </div>
+      <button class="btn ghost sm" id="pxAdd">＋ 添加到列表</button>
+    </div>
+  </div>
+</div>
+
+<!-- 隐私资料弹窗 -->
+<div class="modal-mask" id="alModal">
+  <div class="modal" style="max-width:520px">
+    <div class="hd">修改展示资料<span class="x" onclick="closeAlias()">×</span></div>
+    <div class="bd">
+      <p class="hint">这里改的昵称 / 头像 / UID <b>只在本平台页面上显示</b>，不会修改 B 站真实资料，也不影响后台记录，用于保护隐私。</p>
+      <div class="al-top">
+        <div class="al-avt" id="alAvt"></div>
+        <div class="al-acts">
+          <button class="btn ghost sm" id="alUpload">🖼 上传头像</button>
+          <button class="btn ghost sm" id="alRandFace">🎲 随机头像</button>
+          <input type="file" id="alFile" accept="image/*" style="display:none">
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>展示昵称</label><input id="alName" maxlength="16" placeholder="留空 = 用真实昵称"></div>
+        <div class="field"><label>展示 UID</label><input id="alMid" inputmode="numeric" maxlength="20" placeholder="留空 = 用真实 UID"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <button class="btn" id="alSave">保存</button>
+        <button class="btn ghost" id="alRand">🎲 一键随机（名字+UID+头像）</button>
+        <button class="btn ghost" id="alClear">恢复真实</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+var ALL=[], PX={cur:null, list:[], mode:'none'};
+var SRC_LABEL={qr:'扫码', sms:'手机验证码', ck:'Cookie', ckfile:'Cookie 文件', paste:'粘贴'};
+function srcName(x){return SRC_LABEL[x]||x||'-';}
+function badge(a){
+  if(a.status==='ok') return '<span class="tag ok">正常</span>';
+  if(a.status==='expired') return '<span class="tag err">登录失效</span>';
+  return '<span class="tag warn">风控</span>';
+}
+function maskUid(u){u=(u==null?'':''+u);if(u.length<=5)return u;return u.slice(0,3)+'…'+u.slice(-2)}
+function avt(a){
+  var nm=accName(a);
+  var ch=((nm||'?').trim()||'?').slice(0,1);
+  var f=faceUrl(accFace(a));
+  var img=f?('<img class="face" src="'+BP.esc(f)+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()" alt="">'):'';
+  var fb=f?'<span class="fallback">'+BP.esc(ch)+'</span>':'<span class="fallback"><img class="dft" src="/static/img/nodata.png" alt=""></span>';
+  return '<div class="avt click" onclick="openAlias('+a.id+')" title="点击修改昵称 / 头像 / UID">'+img+fb
+    +'<span class="avt-edit">✎</span></div>';
+}
+async function load(){
+  var d=await BP.api('/api/accounts');
+  ALL=d.accounts||[];
+  render();
+}
+function render(){
+  var box=document.getElementById('list');
+  var q=(document.getElementById('q').value||'').trim().toLowerCase();
+  document.getElementById('qclr').style.display=q?'block':'none';
+  if(!ALL.length){
+    box.innerHTML='<div class="card"><div class="empty"><img src="/static/img/nodata.png">还没有账号，点击右上角「添加账号」，可扫码 / 手机验证码登录 / 导入 Cookie 文件。</div></div>';
+    document.getElementById('cnt').textContent='共 0 个';
+    try{bpClamp('list',3,'listMore');}catch(e){}
+    return;
+  }
+  var list=ALL.filter(function(a){
+    if(!q) return true;
+    var nm=accName(a).toLowerCase(), mid=''+(a.alias_mid||a.mid||'');
+    return nm.indexOf(q)>=0 || mid.indexOf(q)>=0;
+  });
+  document.getElementById('cnt').textContent=q?('筛出 '+list.length+' / 共 '+ALL.length+' 个'):('共 '+ALL.length+' 个');
+  if(!list.length){
+    box.innerHTML='<div class="card"><div class="empty">没有匹配的账号，换个关键词试试。</div></div>';
+    try{bpClamp('list',3,'listMore');}catch(e){}
+    return;
+  }
+  box.innerHTML=list.map(function(a){
+    var pxtag=a.proxy?'<span class="tag blue" title="'+BP.esc(a.proxy)+'">独立IP</span>':'';
+    var aliasTag=(a.alias_name||a.alias_mid||a.alias_face)?'<span class="tag gray" title="已开启隐私显示">隐私名</span>':'';
+    return '<div class="acc">'
+      +avt(a)
+      +'<div class="info">'
+      +'<div class="nm"><b title="'+BP.esc(accName(a))+'">'+BP.esc(accName(a)||'(未知)')+'</b>'+badge(a)+(a.coin_ok?'<span class="tag blue">可投币</span>':'<span class="tag warn">需重扫码投币</span>')+pxtag+aliasTag+'</div>'
+      +'<div class="chips">'
+        +'<span class="kv"><i>粉丝</i><b>'+a.fans+'</b></span>'
+        +'<span class="kv"><i>稿件</i><b>'+a.videos+'</b></span>'
+        +'<span class="kv"><i>硬币</i><b>'+a.coins+'</b></span>'
+        +'<span class="kv"><i>等级</i><b>Lv'+a.level+'</b></span>'
+      +'</div>'
+      +'<div class="meta">UID <span class="mono" title="UID '+BP.esc(a.mid)+'">'+BP.esc(maskUid(a.alias_mid||a.mid))+'</span> · 来源 '+BP.esc(srcName(a.cred_source))+' · 体检 '+(a.last_check_at?('<b class="chk-val">'+BP.esc(a.last_check_at)+'</b>'):'<span class="chk-none">未体检</span>')+'</div>'
+      +'</div>'
+      +'<div class="ops">'
+      +'<button class="btn ghost sm" onclick="openAlias('+a.id+')">改资料</button>'
+      +'<button class="btn ghost sm" onclick="chk('+a.id+')">体检</button>'
+      +'<button class="btn ghost sm" onclick="goWeb('+a.id+')">网页登录</button>'
+      +'<button class="btn ghost sm" onclick="openPx('+a.id+')">IP代理</button>'
+      +'<button class="btn ghost sm" onclick="openLg('+a.id+')">登录IP</button>'
+      +'<button class="btn danger sm" onclick="del('+a.id+')">删除</button>'
+      +'</div></div>';
+  }).join('');
+  try{bpClamp('list',3,'listMore');}catch(e){}
+}
+function goWeb(id){location.href='/web?account_id='+id;}
+async function chk(id){
+  try{
+    var r=await BP.api('/api/accounts/'+id+'/check',{method:'POST'});
+    BP.toast('体检完成：'+(r.account.status==='ok'?'正常':'登录失效'));
+    load();
+  }catch(e){BP.toast(e.message,'err');}
+}
+async function del(id){
+  if(!confirm('确定删除这个账号？'))return;
+  try{await BP.api('/api/accounts/'+id,{method:'DELETE'});BP.toast('已删除');load();}
+  catch(e){BP.toast(e.message,'err');}
+}
+
+/* ============ IP 代理 ============ */
+function closePx(){document.getElementById('pxModal').classList.remove('show');}
+function pxFill(){
+  var s=document.getElementById('pxSel');
+  s.innerHTML=PX.list.length?PX.list.map(function(p){return '<option value="'+p.id+'">'+BP.esc(p.name||p.url)+'（'+BP.esc(p.url)+'）</option>'}).join(''):'<option value="">（列表为空，请先在下方添加）</option>';
+  document.getElementById('pxList').innerHTML=PX.list.length?PX.list.map(function(p){
+    return '<div class="tpl"><div style="min-width:0"><div class="nm">'+BP.esc(p.name||p.url)+'</div><div class="meta mono" style="word-break:break-all">'+BP.esc(p.url)+'</div></div>'
+      +'<span class="sp"></span>'
+      +'<button class="btn ghost sm" onclick="pxTestId('+p.id+')">测试</button> '
+      +'<button class="btn danger sm" onclick="pxDel('+p.id+')">删除</button></div>';
+  }).join(''):'<p class="hint">还没有代理，下面添加一个。</p>';
+}
+async function openPx(id){
+  var a=ALL.filter(function(x){return x.id===id})[0]; if(!a)return;
+  PX.cur=a;
+  document.getElementById('pxAcc').textContent=accName(a)||('UID '+a.mid);
+  document.getElementById('pxCur').textContent=a.proxy||'—（跟随平台策略）—';
+  document.getElementById('pxTestOut').textContent='';
+  document.getElementById('pxVerifyOut').textContent='';
+  PX.mode='none';
+  document.querySelectorAll('#pxMode button').forEach(function(b){b.classList.toggle('on',b.dataset.v==='none')});
+  document.getElementById('pxRowMine').style.display='none';
+  document.getElementById('pxRowManual').style.display='none';
+  document.getElementById('pxModal').classList.add('show');
+  try{
+    var d=await BP.api('/api/proxy/list');
+    PX.list=d.proxies||[];
+    pxFill();
+  }catch(e){}
+}
+document.querySelectorAll('#pxMode button').forEach(function(b){
+  b.onclick=function(){
+    PX.mode=b.dataset.v;
+    document.querySelectorAll('#pxMode button').forEach(function(x){x.classList.toggle('on',x===b)});
+    document.getElementById('pxRowMine').style.display=PX.mode==='mine'?'':'none';
+    document.getElementById('pxRowManual').style.display=PX.mode==='manual'?'':'none';
+  };
+});
+document.getElementById('pxSave').onclick=async function(){
+  if(!PX.cur)return;
+  var body;
+  if(PX.mode==='none'){ body={clear:true}; }
+  else if(PX.mode==='mine'){
+    var v=document.getElementById('pxSel').value;
+    if(!v){BP.toast('请先添加并选择代理','err');return;}
+    body={proxy_id:parseInt(v)};
+  }else{
+    var u=document.getElementById('pxUrl').value.trim();
+    if(!u){BP.toast('请填写代理地址','err');return;}
+    body={url:u};
+  }
+  try{
+    var r=await BP.api('/api/proxy/account/'+PX.cur.id,{method:'POST',body:JSON.stringify(body)});
+    PX.cur.proxy=r.proxy||'';
+    document.getElementById('pxCur').textContent=PX.cur.proxy||'—（跟随平台策略）—';
+    for(var i=0;i<ALL.length;i++)if(ALL[i].id===PX.cur.id)ALL[i].proxy=PX.cur.proxy;
+    BP.toast('已保存');render();
+  }catch(e){BP.toast(e.message,'err');}
+};
+document.getElementById('pxTest').onclick=async function(){
+  var u='';
+  if(PX.mode==='mine'){var v=document.getElementById('pxSel').value;if(v)return pxTestId(parseInt(v));}
+  if(PX.mode==='manual')u=document.getElementById('pxUrl').value.trim();
+  if(!u){BP.toast('请先选择或填写代理','err');return;}
+  await pxTest({url:u});
+};
+async function pxTestId(id){await pxTest({id:id});}
+async function pxTest(body){
+  var out=document.getElementById('pxTestOut');
+  out.textContent='测试中…';
+  try{
+    var r=await BP.api('/api/proxy/test',{method:'POST',body:JSON.stringify(body)});
+    out.textContent=r.ok?('✅ 通！出口 IP：'+(r.ip||'—')+'（'+(r.ms||0)+' ms）'):('❌ 不通：'+(r.error||'未知错误'));
+  }catch(e){out.textContent='❌ '+e.message;}
+}
+document.getElementById('pxAdd').onclick=async function(){
+  var u=document.getElementById('pxNewUrl').value.trim();
+  if(!u){BP.toast('请填写代理地址','err');return;}
+  try{
+    await BP.api('/api/proxy',{method:'POST',body:JSON.stringify({name:document.getElementById('pxNewName').value.trim(),url:u})});
+    document.getElementById('pxNewUrl').value='';document.getElementById('pxNewName').value='';
+    var d=await BP.api('/api/proxy/list');PX.list=d.proxies||[];pxFill();
+    BP.toast('已添加');
+  }catch(e){BP.toast(e.message,'err');}
+};
+async function pxDel(id){
+  if(!confirm('删除该代理？（不影响已应用到账号上的设置）'))return;
+  try{
+    await BP.api('/api/proxy/'+id,{method:'DELETE'});
+    var d=await BP.api('/api/proxy/list');PX.list=d.proxies||[];pxFill();BP.toast('已删除');
+  }catch(e){BP.toast(e.message,'err');}
+}
+document.getElementById('pxVerify').onclick=async function(){
+  if(!PX.cur)return;
+  var out=document.getElementById('pxVerifyOut');
+  out.textContent='正在用这个号的代理访问 B 站…';
+  try{
+    var r=await BP.api('/api/proxy/account/'+PX.cur.id+'/verify',{method:'POST'});
+    var same=r.same_as_direct?' <b style="color:#e5484d">（和服务器直连 IP 一样！这条代理没生效，快去检查）</b>':'';
+    out.innerHTML='✅ 这个号现在从 <b class="mono">'+(r.ip||'—')+'</b> 出去'
+      +((r.country||r.isp)?('（'+(r.country||'')+' '+(r.isp||'')+'）'):'')
+      +'<br>代理：<span class="mono">'+BP.esc(r.proxy||'直连（未设代理）')+'</span>'
+      +'<br>服务器直连 IP：<span class="mono">'+BP.esc(r.direct_ip||'—')+'</span>'+same;
+  }catch(e){out.innerHTML='❌ '+BP.esc(e.message);}
+};
+
+/* ============ B 站登录记录 ============ */
+function closeLg(){document.getElementById('lgModal').classList.remove('show');}
+async function openLg(id){
+  var a=ALL.filter(function(x){return x.id===id})[0]||null;
+  if(!a)return;
+  document.getElementById('lgAcc').textContent=accName(a)||('UID '+a.mid);
+  document.getElementById('lgCur').textContent=a.proxy||'—（跟随平台策略）—';
+  document.getElementById('lgList').innerHTML='<p class="hint">加载中…</p>';
+  document.getElementById('lgModal').classList.add('show');
+  try{
+    var r=await BP.api('/api/accounts/'+id+'/login-log');
+    var L=r.list||[];
+    if(!L.length){
+      document.getElementById('lgList').innerHTML='<p class="hint">没有拿到登录记录（'+(r.error||'列表为空')+'）</p>';return;
+    }
+    document.getElementById('lgList').innerHTML='<div class="lg-rows">'+L.map(function(x){
+        var hit=r.proxy_ip&&x.ip===r.proxy_ip;
+        return '<div class="lg-row"'+(hit?' style="background:#eefaf2"':'')+'>'
+          +'<div class="lg-ip mono">'+BP.esc(x.ip||'')+(hit?' <span class="tag blue">与代理一致</span>':'')+'</div>'
+          +'<div class="lg-meta hint">'+BP.esc(x.geo||'—')+' · '+BP.esc(x.time_at||'')+'</div></div>';
+      }).join('')+'</div>'
+      +'<p class="hint" style="margin-top:8px">共 '+r.count+' 条登录记录。'
+      +(r.proxy_ip?('带「与代理一致」的就是这个号代理的出口 IP '+BP.esc(r.proxy_ip)+'。'):'该号没设专属代理，登录会是平台线路 IP。')+'</p>';
+  }catch(e){document.getElementById('lgList').innerHTML='<p class="hint">'+BP.esc(e.message)+'</p>';}
+}
+
+var qEl=document.getElementById('q');
+qEl.addEventListener('input',render);
+document.getElementById('qclr').addEventListener('click',function(){qEl.value='';render();qEl.focus();});
+
+/* ============ 隐私资料 ============ */
+var AL={cur:null};
+function closeAlias(){document.getElementById('alModal').classList.remove('show');}
+function alRenderAvt(a){
+  var nm=(document.getElementById('alName').value||'').trim()||accName(a);
+  var ch=((nm||'?').trim()||'?').slice(0,1);
+  var f=faceUrl(accFace(a));
+  document.getElementById('alAvt').innerHTML=(f?'<img src="'+BP.esc(f)+'" alt="">':'<span>'+BP.esc(ch)+'</span>');
+}
+function openAlias(id){
+  var a=ALL.filter(function(x){return x.id===id})[0]; if(!a)return;
+  AL.cur=a;
+  document.getElementById('alName').value=a.alias_name||'';
+  document.getElementById('alMid').value=a.alias_mid||'';
+  alRenderAvt(a);
+  document.getElementById('alModal').classList.add('show');
+}
+document.getElementById('alName').addEventListener('input',function(){if(AL.cur)alRenderAvt(AL.cur)});
+document.getElementById('alSave').onclick=async function(){
+  if(!AL.cur)return;
+  try{
+    await BP.api('/api/accounts/'+AL.cur.id+'/alias',{method:'POST',body:JSON.stringify({
+      alias_name:document.getElementById('alName').value.trim(),
+      alias_mid:document.getElementById('alMid').value.trim()})});
+    BP.toast('已保存');closeAlias();load();
+  }catch(e){BP.toast(e.message,'err');}
+};
+document.getElementById('alClear').onclick=async function(){
+  if(!AL.cur)return;
+  try{
+    await BP.api('/api/accounts/'+AL.cur.id+'/alias',{method:'POST',body:JSON.stringify({
+      alias_name:'',alias_mid:'',alias_face:''})});
+    BP.toast('已恢复真实资料');closeAlias();load();
+  }catch(e){BP.toast(e.message,'err');}
+};
+document.getElementById('alRand').onclick=function(){
+  var pool=['风见幽香','八云紫','雾雨魔理沙','博丽灵梦','十六夜咲夜','西行寺幽幽子'];
+  document.getElementById('alName').value=pool[Math.floor(Math.random()*pool.length)];
+  document.getElementById('alMid').value=String(Math.floor(Math.random()*9e7)+1e7);
+  if(AL.cur)alRenderAvt(AL.cur);
+};
+document.getElementById('alUpload').onclick=function(){document.getElementById('alFile').click()};
+document.getElementById('alFile').onchange=async function(){
+  var f=this.files[0]; if(!f||!AL.cur)return;
+  var fd=new FormData(); fd.append('file',f);
+  try{
+    var res=await fetch('/api/accounts/'+AL.cur.id+'/alias-face',{method:'POST',body:fd,credentials:'same-origin'});
+    var d=await res.json();
+    if(!res.ok)throw new Error(d.detail||'上传失败');
+    AL.cur.alias_face=d.url;
+    alRenderAvt(AL.cur);BP.toast('头像已更新');load();
+  }catch(e){BP.toast(e.message,'err');}
+  this.value='';
+};
+document.getElementById('alRandFace').onclick=function(){
+  if(!AL.cur)return;
+  AL.cur.alias_face='https://api.dicebear.com/7.x/bottts/svg?seed='+Math.random();
+  alRenderAvt(AL.cur);
+  BP.api('/api/accounts/'+AL.cur.id+'/alias',{method:'POST',body:JSON.stringify({alias_face:AL.cur.alias_face})})
+    .then(function(){BP.toast('头像已换');load()}).catch(function(e){BP.toast(e.message,'err')});
+};
+
+load().catch(function(e){BP.toast(e.message,'err')});
+</script>
+{% endblock %}
+

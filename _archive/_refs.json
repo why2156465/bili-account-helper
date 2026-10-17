@@ -1,0 +1,22 @@
+[
+ "/admin234",
+ "/api/auth/captcha",
+ "/api/auth/captcha/needed",
+ "/api/auth/forgot",
+ "/api/auth/login",
+ "/api/auth/login_verify",
+ "/api/auth/login_verify/resend",
+ "/api/auth/register",
+ "/api/auth/reset",
+ "/api/auth/send_code",
+ "/dashboard",
+ "/login",
+ "/register",
+ "/static/app.css",
+ "/static/client.css",
+ "/static/img/bili_logo.svg",
+ "/static/img/mascot/m22_idea.webp",
+ "/static/img/mascot_2233_door.png",
+ "/static/img/nodata.png",
+ "/vip"
+]

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% set nav = 'logs' %}
+{% block title %}日志{% endblock %}
+
+{% block content %}
+<div class="page-head"><h1>操作日志 <span class="hint" id="total"></span></h1></div>
+
+<div class="searchbar">
+  <span class="s-ic">🔍</span>
+  <input id="lq" type="search" placeholder="搜索账号 / 目标 / 动作 / 结果关键词" autocomplete="off" enterkeyhint="search">
+  <button class="clr" id="lqclr" type="button" aria-label="清空">✕</button>
+</div>
+
+<!-- 实时进度条：与原站 /api/tasks/progress 轮询行为一致 -->
+<div class="card" id="progCard" style="display:none;margin-bottom:14px">
+  <div class="card-hd"><i class="dot"></i>任务进度 <span class="hint" id="progLabel" style="margin-left:8px"></span></div>
+  <div class="card-bd">
+    <div class="prog"><i id="progBar" style="width:0%"></i></div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap">
+      <span class="hint" id="progStat"></span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn ghost sm" id="progPause">暂停</button>
+      <button class="btn ghost sm" id="progStop">停止</button>
+      <button class="btn ghost sm" id="progDismiss">收起</button>
+    </div>
+    <div class="ckeview" id="progLog" style="margin-top:10px;max-height:220px;overflow:auto;display:none"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>时间</th><th>账号</th><th>目标</th><th>动作</th><th>视频</th><th>结果</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+<div style="text-align:center;margin:16px 0"><button class="btn ghost sm" id="more">加载更多</button></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var PAGE=1, ALL=[], Q='';
+const ACTION_LABEL={like:'点赞',coin:'投币',fav:'收藏',comment:'评论',share:'分享',
+                    follow:'关注',play:'刷播放',opus:'图文',interact:'互赞',dm:'私信',upload:'投稿'};
+
+function render(){
+  var list=ALL.filter(function(r){
+    if(!Q) return true;
+    var hay=[r.account,r.action,r.target,r.result,r.video].join(' ').toLowerCase();
+    return hay.indexOf(Q)>=0;
+  });
+  document.getElementById('total').textContent = ALL.length? ('共 '+ALL.length+' 条'+(Q?('，筛出 '+list.length):'')) : '';
+  var tb=document.getElementById('rows');
+  if(!list.length){ tb.innerHTML='<tr><td colspan="6" class="empty">还没有操作记录</td></tr>'; return; }
+  tb.innerHTML=list.map(function(r){
+    var ok = r.result==='ok';
+    return '<tr>'
+      +'<td class="hint">'+BP.esc(r.created_at||'')+'</td>'
+      +'<td>'+BP.esc(r.account||'-')+'</td>'
+      +'<td class="mono">'+BP.esc(r.target||'-')+'</td>'
+      +'<td>'+(ACTION_LABEL[r.action]||BP.esc(r.action))+'</td>'
+      +'<td class="mono">'+BP.esc(r.video||'-')+'</td>'
+      +'<td>'+(ok?'<span class="tag ok">成功</span>':'<span class="tag err">失败</span>')
+      +(r.code?' <span class="hint">'+r.code+'</span>':'')+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+async function load(){
+  try{
+    var d=await BP.api('/api/logs?page='+PAGE+'&limit=50');
+    ALL=ALL.concat(d.items||[]);
+    render();
+    document.getElementById('more').style.display=(d.items&&d.items.length>=50)?'':'none';
+  }catch(e){ BP.toast(e.message,'err'); }
+}
+document.getElementById('more').onclick=function(){ PAGE+=1; load(); };
+var lq=document.getElementById('lq');
+lq.addEventListener('input',function(){
+  Q=lq.value.trim().toLowerCase();
+  document.getElementById('lqclr').style.display=Q?'block':'none';
+  render();
+});
+document.getElementById('lqclr').onclick=function(){
+  lq.value='';Q='';document.getElementById('lqclr').style.display='none';render();lq.focus();
+};
+
+/* ---- 进度轮询（与原站一致：1.5 秒一次） ---- */
+var HIDDEN=false;
+function fmtLogs(arr){
+  return (arr||[]).map(function(x){
+    var color = x.lv==='err'?'#e03131':(x.lv==='warn'?'#e8590c':'#3b4049');
+    return '<div style="color:'+color+'"><span class="hint">'+BP.esc(x.t||'')+'</span> '+BP.esc(x.m||'')+'</div>';
+  }).join('');
+}
+async function tickProg(){
+  try{
+    var p=await BP.api('/api/tasks/progress');
+    var card=document.getElementById('progCard');
+    if(!p.running && !p.finished_at){ card.style.display='none'; return; }
+    if(HIDDEN){ card.style.display='none'; return; }
+    card.style.display='';
+    document.getElementById('progLabel').textContent=p.label||'';
+    document.getElementById('progBar').style.width=(p.percent||0)+'%';
+    document.getElementById('progStat').textContent=
+      (p.running?('进行中 '+(p.done||0)+'/'+(p.total||0)):'已结束 '+(p.done||0)+'/'+(p.total||0))
+      +' · 成功 '+(p.ok||0)+' · 失败 '+(p.fail||0)
+      +(p.current?(' · '+p.current):'')
+      +(p.eta?(' · 预计剩余 '+p.eta+'s'):'')
+      +(p.error?(' · '+p.error):'');
+    var lg=document.getElementById('progLog');
+    var html=fmtLogs(p.logs&&p.logs.length?p.logs:(p.log||[]).map(function(m){return {m:m}}));
+    if(html){ lg.innerHTML=html; lg.style.display=''; lg.scrollTop=lg.scrollHeight; }
+    document.getElementById('progPause').textContent=p.paused?'继续':'暂停';
+    document.getElementById('progPause').disabled=!p.running;
+    document.getElementById('progStop').disabled=!p.running;
+  }catch(e){}
+}
+document.getElementById('progPause').onclick=async function(){
+  try{
+    var p=await BP.api('/api/tasks/progress');
+    await BP.api('/api/tasks/'+(p.paused?'resume':'pause'),{method:'POST'});
+    tickProg();
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+document.getElementById('progStop').onclick=async function(){
+  try{ await BP.api('/api/tasks/stop',{method:'POST'}); BP.toast('已发送停止指令'); tickProg(); }
+  catch(e){ BP.toast(e.message,'err'); }
+};
+document.getElementById('progDismiss').onclick=function(){
+  HIDDEN=true;
+  document.getElementById('progCard').style.display='none';
+  BP.api('/api/tasks/progress/dismiss',{method:'POST'}).catch(function(){});
+};
+
+load();
+tickProg();
+setInterval(tickProg,1500);
+</script>
+{% endblock %}

@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% set nav = 'settings' %}
+{% block title %}设置{% endblock %}
+
+{% block content %}
+<div class="page-head"><h1>我的设置</h1></div>
+
+<div class="card">
+  <div class="card-hd">我的代理 IP（选填）</div>
+  <div class="card-bd">
+    <p class="hint" id="policy-hint">加载中…</p>
+    <div class="px-add">
+      <input id="px-name" type="text" placeholder="备注名，如 香港1（可留空）">
+      <input id="px-url" type="text" placeholder="代理地址：ip:端口 / user:pass@ip:端口 / socks5://ip:端口">
+      <button class="btn" id="px-add" type="button">添加到我的列表</button>
+    </div>
+    <div id="px-list" class="px-list"><p class="hint">加载中…</p></div>
+    <p class="hint" id="px-out" style="margin:2px 0 8px"></p>
+    <p class="hint">先把代理添加进列表：① 在添加 / 编辑 B 站账号时可逐个选用；② 没给账号单独指定时，会自动用列表里的代理，并按账号分配。</p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <div class="card-hd">邮箱与通知</div>
+  <div class="card-bd">
+    <p class="hint" id="mail-hint">加载中…</p>
+    <div class="field">
+      <label>当前绑定邮箱</label>
+      <div class="ro-line"><b id="cur-email">—</b>
+        <button class="btn ghost sm" id="chBtn" type="button">换绑邮箱</button></div>
+    </div>
+
+    <div id="chBox" style="display:none;background:#fafbfc;border:1px solid #e8ebf0;border-radius:12px;padding:12px;margin-bottom:12px">
+      <p class="hint" style="margin:0 0 10px">换绑需同时验证 <b>新邮箱验证码</b> 和 <b>当前密码</b>；成功后登录安全验证、通知邮件都会发到新邮箱。</p>
+      <div class="field"><label>新邮箱</label><input id="new-email" type="email" placeholder="new@example.com"></div>
+      <div class="field">
+        <label>验证码</label>
+        <div class="cap-line">
+          <span class="cap-q" id="cap-q">—</span>
+          <input id="cap-a" type="text" inputmode="numeric" autocomplete="off" placeholder="答案" style="max-width:110px">
+          <button class="btn ghost sm" id="cap-r" type="button">换一题</button>
+          <button class="btn ghost sm" id="codeBtn" type="button">发送邮箱验证码</button>
+        </div>
+        <p class="hint" id="code-out" style="margin:8px 0 0"></p>
+      </div>
+      <div class="field"><label>邮箱验证码</label>
+        <input id="mail-code" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="新邮箱收到的 6 位验证码" style="max-width:240px"></div>
+      <div class="field"><label>当前密码</label>
+        <input id="ch-pw" type="password" autocomplete="current-password" placeholder="确认是你本人操作"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn" id="chSave" type="button">确认换绑</button>
+        <button class="btn ghost" id="chCancel" type="button">取消</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input id="notify" type="checkbox" style="width:auto"> 账号登录态失效时给我发邮件
+      </label>
+    </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input id="email_verify" type="checkbox" style="width:auto"> 异地登录邮箱安全验证（换 IP 登录时需邮箱验证码）
+      </label>
+    </div>
+    <p class="hint" style="margin:0 0 10px">账号登录态失效时会给你发提醒邮件。</p>
+    <button class="btn" id="save2">保存</button>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <div class="card-hd">修改密码</div>
+  <div class="card-bd">
+    <div class="field"><label>原密码</label><input id="op" type="password" autocomplete="current-password" placeholder="请输入当前密码"></div>
+    <div class="field"><label>新密码</label><input id="np" type="password" autocomplete="new-password" maxlength="20" placeholder="8-20 位，且包含字母"></div>
+    <button class="btn ghost" id="pwBtn">更新密码</button>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <div class="card-hd">我的模板</div>
+  <div class="card-bd">
+    <p class="hint" id="tpl-hint">投稿模板与互赞模板统一在这里管理。在「投稿」或「互赞」页面把当前配置存为模板后，可在此处随时一键使用。</p>
+    <div class="seg" style="margin-bottom:12px">
+      <button id="tt-upload" class="on" onclick="tplTab('upload')">投稿模板</button>
+      <button id="tt-interact" onclick="tplTab('interact')">互赞模板</button>
+    </div>
+    <div class="cards" id="tplList"><p class="hint">加载中…</p></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <div class="card-hd">我的账号</div>
+  <div class="card-bd" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+    <span class="hint">当前登录：<b>{{ user.username }}</b></span>
+    <button class="btn danger" id="logoutBtn">退出登录</button>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <div class="card-hd">快捷入口</div>
+  <div class="card-bd" style="display:flex;gap:10px;flex-wrap:wrap">
+    <a class="btn ghost sm" href="/publish">投稿</a>
+    <a class="btn ghost sm" href="/messages">私信</a>
+    <a class="btn ghost sm" href="/notices">消息通知</a>
+    
+    <a class="btn ghost sm" href="/tasks">互赞任务</a>
+    <a class="btn ghost sm" href="/scheduler">定时任务</a>
+    <a class="btn ghost sm" href="/logs">日志</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var CAPTOK='', TPLKIND='upload';
+
+/* ---- 代理列表 ---- */
+async function loadProxy(){
+  try{
+    var d=await BP.api('/api/proxy/list');
+    var list=d.proxies||[];
+    document.getElementById('policy-hint').textContent='账号专属代理优先级最高；没单独指定时按平台策略走（当前：'+(d.policy||'off')+'）。';
+    document.getElementById('px-list').innerHTML=list.length?list.map(function(p){
+      return '<div class="tpl"><div style="min-width:0"><div class="nm">'+BP.esc(p.name||p.url)+'</div>'
+        +'<div class="meta mono" style="word-break:break-all">'+BP.esc(p.url)+'</div></div>'
+        +'<span class="sp"></span>'
+        +'<button class="btn ghost sm" onclick="pxTest('+p.id+')">测试</button> '
+        +'<button class="btn danger sm" onclick="pxDel('+p.id+')">删除</button></div>';
+    }).join(''):'<p class="hint">还没有代理，上面添加一个。</p>';
+  }catch(e){ document.getElementById('px-list').innerHTML='<p class="hint">'+BP.esc(e.message)+'</p>'; }
+}
+document.getElementById('px-add').onclick=async function(){
+  var url=document.getElementById('px-url').value.trim();
+  if(!url){ BP.toast('请填代理地址','err'); return; }
+  try{
+    await BP.api('/api/proxy',{method:'POST',body:JSON.stringify({
+      name:document.getElementById('px-name').value.trim(), url:url})});
+    document.getElementById('px-name').value='';
+    document.getElementById('px-url').value='';
+    BP.toast('已添加'); loadProxy();
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+async function pxTest(id){
+  var out=document.getElementById('px-out');
+  out.textContent='测试中…';
+  try{
+    var r=await BP.api('/api/proxy/test',{method:'POST',body:JSON.stringify({id:id})});
+    out.textContent=r.ok?('✅ 通！出口 IP：'+(r.ip||'—')+'（'+(r.ms||0)+' ms）'):('❌ 不通：'+(r.error||''));
+  }catch(e){ out.textContent='❌ '+e.message; }
+}
+async function pxDel(id){
+  if(!confirm('删除该代理？')) return;
+  await BP.api('/api/proxy/'+id,{method:'DELETE'});
+  BP.toast('已删除'); loadProxy();
+}
+
+/* ---- 邮箱与通知 ---- */
+async function loadMail(){
+  try{
+    var d=await BP.api('/api/me/settings');
+    document.getElementById('cur-email').textContent=d.email||'—';
+    document.getElementById('mail-hint').textContent=d.mail_enabled
+      ? '本服务器已配置发信，验证码会发到你的邮箱。' : '本服务器未配置发信，验证码会打印到服务器控制台。';
+    document.getElementById('notify').checked=!!d.notify;
+    document.getElementById('email_verify').checked=true;
+  }catch(e){ document.getElementById('mail-hint').textContent=BP.esc(e.message); }
+}
+document.getElementById('chBtn').onclick=function(){
+  var b=document.getElementById('chBox');
+  b.style.display=b.style.display==='none'?'':'none';
+  if(b.style.display==='') loadCap();
+};
+document.getElementById('chCancel').onclick=function(){ document.getElementById('chBox').style.display='none'; };
+async function loadCap(){
+  try{
+    var d=await BP.api('/api/auth/captcha');
+    CAPTOK=d.token;
+    document.getElementById('cap-q').textContent=d.q;
+    document.getElementById('cap-a').value='';
+  }catch(e){}
+}
+document.getElementById('cap-r').onclick=loadCap;
+document.getElementById('codeBtn').onclick=async function(){
+  var em=document.getElementById('new-email').value.trim();
+  var cap=document.getElementById('cap-a').value.trim();
+  if(!em){ BP.toast('请填新邮箱','err'); return; }
+  if(!cap){ BP.toast('请先算验证码','err'); return; }
+  try{
+    var r=await BP.api('/api/me/email_code',{method:'POST',body:JSON.stringify({
+      email:em, captcha:cap, captcha_token:CAPTOK})});
+    document.getElementById('code-out').textContent=r.message||'验证码已发送';
+    BP.cd(this,60,'发送邮箱验证码');
+  }catch(e){
+    document.getElementById('code-out').textContent=e.message;
+    loadCap();
+  }
+};
+document.getElementById('chSave').onclick=async function(){
+  var em=document.getElementById('new-email').value.trim();
+  var code=document.getElementById('mail-code').value.trim();
+  if(!em||!code){ BP.toast('请填新邮箱和验证码','err'); return; }
+  try{
+    await BP.api('/api/me/email',{method:'POST',body:JSON.stringify({email:em, code:code})});
+    BP.toast('邮箱已更新');
+    document.getElementById('chBox').style.display='none';
+    loadMail();
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+document.getElementById('save2').onclick=async function(){
+  try{
+    await BP.api('/api/me/settings',{method:'POST',body:JSON.stringify({
+      notify:document.getElementById('notify').checked,
+      email_verify:document.getElementById('email_verify').checked})});
+    BP.toast('已保存');
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+
+/* ---- 改密码 ---- */
+document.getElementById('pwBtn').onclick=async function(){
+  var old=document.getElementById('op').value;
+  var np=document.getElementById('np').value;
+  if(np.length<8){ BP.toast('新密码至少 8 位','err'); return; }
+  if(!/[A-Za-z]/.test(np)){ BP.toast('新密码必须包含字母','err'); return; }
+  var cap;
+  try{ cap=await BP.api('/api/auth/captcha'); }catch(e){ BP.toast('获取验证码失败','err'); return; }
+  var n=(cap.q.match(/\d+/g)||[]).map(Number);
+  var op=(cap.q.match(/[+\-\u00d7]/)||['+'])[0];
+  var ans={'+':n[0]+n[1],'-':(n[0]||0)-(n[1]||0),'\u00d7':(n[0]||0)*(n[1]||0)}[op];
+  try{
+    await BP.api('/api/me/password',{method:'POST',body:JSON.stringify({
+      old:old, password:np, captcha:String(ans), captcha_token:cap.token})});
+    BP.toast('密码已更新');
+    document.getElementById('op').value='';
+    document.getElementById('np').value='';
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+
+/* ---- 模板 ---- */
+function tplTab(k){
+  TPLKIND=k;
+  document.getElementById('tt-upload').classList.toggle('on',k==='upload');
+  document.getElementById('tt-interact').classList.toggle('on',k==='interact');
+  loadTpls();
+}
+async function loadTpls(){
+  try{
+    var d=await BP.api('/api/templates?kind='+TPLKIND);
+    var list=d.templates||[];
+    document.getElementById('tplList').innerHTML=list.length?list.map(function(t){
+      return '<div class="card"><div class="card-bd">'
+        +'<div style="display:flex;align-items:center;gap:8px"><b>'+BP.esc(t.name)+'</b><span class="sp" style="flex:1"></span>'
+        +'<a class="btn ghost sm" href="/'+(TPLKIND==='upload'?'publish':'tasks')+'?tpl='+t.id+'">使用</a> '
+        +'<button class="btn danger sm" onclick="delTpl('+t.id+')">删除</button></div>'
+        +'<div class="hint" style="margin-top:6px">'+BP.esc((t.config||{}).title||(t.config||{}).actions?Object.keys((t.config||{}).actions||{}).length+' 个动作':'—')+'</div>'
+        +'</div></div>';
+    }).join(''):'<p class="hint">这个分类下还没有模板。</p>';
+  }catch(e){ document.getElementById('tplList').innerHTML='<p class="hint">'+BP.esc(e.message)+'</p>'; }
+}
+async function delTpl(id){
+  if(!confirm('删除该模板？')) return;
+  await BP.api('/api/templates/'+id,{method:'DELETE'});
+  BP.toast('已删除'); loadTpls();
+}
+
+document.getElementById('logoutBtn').onclick=async function(){
+  try{ await BP.api('/api/auth/logout',{method:'POST'}); }catch(e){}
+  location.href='/login';
+};
+
+loadProxy(); loadMail(); loadTpls();
+</script>
+{% endblock %}

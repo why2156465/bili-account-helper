@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+{% set nav = 'tasks' %}
+{% block title %}互赞{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>互赞任务</h1>
+  <div class="spacer"></div>
+  <a class="btn ghost sm" href="/scheduler">⏰ 定时任务</a>
+</div>
+
+<div class="card">
+  <div class="card-hd"><i class="dot"></i>① 执行账号（用哪些号去操作）</div>
+  <div class="card-bd">
+    <div class="pick" style="gap:8px;margin-bottom:8px">
+      <button class="btn ghost sm" type="button" id="actors-toggle">收起</button>
+      <span class="clp-sum" id="actors-sum"></span>
+    </div>
+    <div class="pick" id="actors"></div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <div class="card-hd"><i class="dot"></i>② 目标（操作谁的视频）</div>
+  <div class="card-bd">
+    <div id="targets"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn ghost sm" id="addMine">＋ 我的账号</button>
+      <button class="btn ghost sm" id="addUid">＋ 指定 UID</button>
+      <button class="btn ghost sm" id="preview">预览匹配视频</button>
+    </div>
+    <div id="pv" style="margin-top:12px"></div>
+    <p class="hint" style="margin-top:8px">「指定 UID」可添加任意个；可操作任意 UID 的投稿与图文。</p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <div class="card-hd"><i class="dot"></i>③ 动作</div>
+  <div class="card-bd">
+    <div class="acts" id="acts">
+      <div class="act on" data-act="like">
+        <div class="act-hd"><span class="ico">👍</span><label class="switch" style="margin:0"><input type="checkbox" data-on="like" checked> 点赞</label></div>
+      </div>
+
+      <div class="act" data-act="coin">
+        <div class="act-hd"><span class="ico">🪙</span><label class="switch" style="margin:0"><input type="checkbox" data-on="coin"> 投币</label></div>
+        <div class="act-sub">
+          <div class="row"><label>投币数量</label>
+            <div class="chips" id="coin-num"><span class="chip on" data-v="1">1 币</span><span class="chip" data-v="2">2 币</span></div>
+          </div>
+          <div class="row"><label class="switch"><input type="checkbox" id="coin-like"> 同时点赞</label></div>
+        </div>
+      </div>
+
+      <div class="act" data-act="fav">
+        <div class="act-hd"><span class="ico">⭐</span><label class="switch" style="margin:0"><input type="checkbox" data-on="fav"> 收藏</label></div>
+        <div class="act-sub">
+          <div class="row"><label>收藏夹 media_id（留空自动用默认收藏夹）</label><input id="fav-folder" type="number" placeholder="自动"></div>
+        </div>
+      </div>
+
+      <div class="act" data-act="comment">
+        <div class="act-hd"><span class="ico">💬</span><label class="switch" style="margin:0"><input type="checkbox" data-on="comment"> 评论</label></div>
+        <div class="act-sub">
+          <div class="row"><label>评论内容</label><input id="cmt" type="text" value="主播我爱你"></div>
+          <div class="row"><label>表情包（可多选）</label><div class="chips" id="cmt-emotes"></div></div>
+          <div class="row"><label class="switch"><input type="checkbox" id="cmt-emote"> 未选表情时从常用里随机附一个</label></div>
+        </div>
+      </div>
+
+      <div class="act" data-act="share">
+        <div class="act-hd"><span class="ico">↗</span><label class="switch" style="margin:0"><input type="checkbox" data-on="share"> 分享</label></div>
+        <div class="act-sub">
+          <div class="row"><label>分享方式</label>
+            <div class="chips" id="share-mode"><span class="chip on" data-v="normal">隐形分享</span><span class="chip" data-v="dynamic">转发到动态</span></div>
+          </div>
+          <div class="row" id="share-text-row" style="display:none"><label>动态文案</label><input id="share-text" type="text" value="转发视频"></div>
+        </div>
+      </div>
+
+      <div class="act" data-act="follow">
+        <div class="act-hd"><span class="ico">➕</span><label class="switch" style="margin:0"><input type="checkbox" data-on="follow"> 关注</label></div>
+      </div>
+
+      <div class="act" data-act="play">
+        <div class="act-hd"><span class="ico">▶</span><label class="switch" style="margin:0"><input type="checkbox" data-on="play"> 刷播放量</label></div>
+      </div>
+
+      <div class="act" data-act="opus">
+        <div class="act-hd"><span class="ico">📝</span><label class="switch" style="margin:0"><input type="checkbox" data-on="opus"> 图文（点赞/转发/评论）</label></div>
+        <div class="act-sub">
+          <div class="row"><label>每个目标处理几条图文</label><input id="opus-max" type="number" value="5" min="1"></div>
+          <div class="row"><label>操作（可多选）</label>
+            <div class="chips" id="opus-acts">
+              <span class="chip on" data-v="like">点赞</span>
+              <span class="chip" data-v="repost">转发</span>
+              <span class="chip" data-v="comment">评论</span>
+            </div>
+          </div>
+          <div class="row" id="opus-repost-row" style="display:none"><label>转发方式</label>
+            <div class="chips" id="opus-rep-mode"><span class="chip on" data-v="normal">正常转发</span><span class="chip" data-v="hidden">隐形转发</span></div>
+          </div>
+          <div class="row" id="opus-repost-text-row" style="display:none"><label>转发文案</label><input id="opus-repost-text" type="text" value="转发动态"></div>
+          <div class="row" id="opus-cmt-row" style="display:none"><label>评论文案</label><input id="opus-cmt-text" type="text" value="好内容，支持一下"></div>
+          <p class="hint">对目标 UP 的图文/动态操作。B 站动态本身没有「收藏」入口，故提供 点赞 / 转发 / 评论。<br><b>隐形转发</b>＝转发到你的动态后立即删除，主页不留痕。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:16px;max-width:260px">
+      <label>动作间隔（秒）</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="sleep-min" type="number" value="3" min="1" style="width:80px">
+        <span class="hint">~</span>
+        <input id="sleep-max" type="number" value="7" min="1" style="width:80px">
+      </div>
+    </div>
+
+    <div class="tpl-bar">
+      <select id="tpl-pick"><option value="">— 载入互赞模板 —</option></select>
+      <button class="btn ghost sm" id="tpl-save">存为模板</button>
+      <a class="btn ghost sm" href="/templates">🗂 模板管理</a>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+      <button class="btn" id="runBtn">立即执行</button>
+      <button class="btn blue" id="cronBtn">保存为定时任务</button>
+    </div>
+    <p class="hint" style="margin-top:12px">执行在后台进行；可去「日志」查看实时进度。</p>
+  </div>
+</div>
+
+<div class="modal-mask" id="cronModal">
+  <div class="modal">
+    <div class="hd">保存为定时任务<span class="x" onclick="closeModal()">×</span></div>
+    <div class="bd">
+      <div class="field"><label>任务名称</label><input id="cron-name" type="text" value="每日互赞"></div>
+      <div class="field"><label>执行频率</label>
+        <select id="cron-type">
+          <option value="daily">每天固定时间</option>
+          <option value="hourly">每隔 N 小时</option>
+        </select>
+      </div>
+      <div class="field" id="row-daily"><label>每天几点</label><input id="cron-time" type="time" value="09:00"></div>
+      <div class="field" id="row-hourly" style="display:none"><label>每隔几小时</label>
+        <select id="cron-n"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>6</option><option>8</option><option>12</option></select>
+      </div>
+      <p class="hint">将使用上面「执行账号 / 目标 / 动作」的配置。保存后可在「定时任务」页管理。</p>
+    </div>
+    <div class="ft"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" id="cronSave">保存</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+var CHIPV={coinNum:1,shareMode:'normal'};
+var ACCS=[], TGT=[], actorSel={all:true,ids:[]};
+var EMOTE_LIST=['[doge]','[大笑]','[星星眼]','[打call]','[妙啊]','[吃瓜]','[惊喜]','[点赞]','[呲牙]','[辣眼睛]','[尴尬]','[疼]'];
+var EMOTES_SEL=[], OPUS_SEL=['like'], OPUS_REP_MODE='normal';
+
+
+function bindChips(id,key,after){
+  document.querySelectorAll('#'+id+' .chip').forEach(function(c){
+    c.onclick=function(){
+      document.querySelectorAll('#'+id+' .chip').forEach(function(x){x.classList.remove('on')});
+      c.classList.add('on'); CHIPV[key]=c.getAttribute('data-v'); if(after)after();
+    };
+  });
+}
+document.querySelectorAll('.act').forEach(function(a){
+  var cb=a.querySelector('input[data-on]');
+  cb.onchange=function(){a.classList.toggle('on',cb.checked)};
+});
+bindChips('coin-num','coinNum');
+bindChips('share-mode','shareMode',function(){
+  document.getElementById('share-text-row').style.display=(CHIPV.shareMode==='dynamic')?'':'none';
+});
+document.getElementById('cron-type').onchange=function(){
+  document.getElementById('row-daily').style.display=this.value==='daily'?'':'none';
+  document.getElementById('row-hourly').style.display=this.value==='hourly'?'':'none';
+};
+
+/* ---- ① 执行账号 ---- */
+function actorSummary(){
+  if(!ACCS.length) return '';
+  if(actorSel.all) return '全部 '+ACCS.length+' 个账号';
+  if(!actorSel.ids.length) return '未选账号，点「展开」选择';
+  if(actorSel.ids.length===ACCS.length) return '已选全部 '+ACCS.length+' 个账号';
+  return '已选 '+actorSel.ids.length+' 个：'+actorSel.ids.map(function(id){
+    var a=ACCS.filter(function(x){return x.id===id})[0]; return a?accName(a):('账号'+id);
+  }).join('、');
+}
+function renderActors(){
+  document.getElementById('actors').innerHTML=
+    '<span class="chip '+(actorSel.all?'on':'')+'" data-all="1">全部账号</span>'+
+    ACCS.map(function(a){
+      return '<span class="chip '+(actorSel.ids.indexOf(a.id)>=0?'on':'')+'" data-id="'+a.id+'">'
+        +BP.esc(accName(a))+' ('+BP.esc(accMid(a))+')</span>';
+    }).join('');
+  document.querySelectorAll('#actors .chip').forEach(function(c){
+    c.onclick=function(){
+      if(c.getAttribute('data-all')){ actorSel.all=!actorSel.all; actorSel.ids=[]; }
+      else{
+        var id=parseInt(c.getAttribute('data-id'));
+        var i=actorSel.ids.indexOf(id);
+        if(i>=0) actorSel.ids.splice(i,1); else actorSel.ids.push(id);
+        actorSel.all=false;
+      }
+      renderActors();
+    };
+  });
+  document.getElementById('actors-sum').textContent=actorSummary();
+}
+document.getElementById('actors-toggle').onclick=function(){
+  var box=document.getElementById('actors');
+  var hide=box.style.display!=='none';
+  box.style.display=hide?'none':'';
+  this.textContent=hide?'展开':'收起';
+};
+
+/* ---- ② 目标 ---- */
+function ruleDesc(t){
+  var m=t.max||1;
+  if(t.rule==='latest') return '该 UP 的最新 '+m+' 个视频';
+  if(t.rule==='all') return '最近投稿，最多 '+(t.max||10)+' 个';
+  if(t.rule==='random') return '从最新 '+(t.max||20)+' 个里随机挑 '+(t.n||1)+' 个';
+  if(t.rule==='date') return '发布日期 = '+(t.date||'未填');
+  if(t.rule==='range') return '发布时间在 '+(t.from||'?')+' ~ '+(t.to||'?')+' 之间（最多 '+(t.max||10)+' 个）';
+  if(t.rule==='bvids') return '指定 '+((t.bvids||[]).length)+' 个 BV 号';
+  return '';
+}
+function ruleParams(t,i){
+  if(t.rule==='latest') return '<label>数量</label><input type="number" min="1" value="'+(t.max||1)+'" onchange="setF('+i+',\'max\',this.value)">';
+  if(t.rule==='all') return '<label>最多</label><input type="number" min="1" value="'+(t.max||10)+'" onchange="setF('+i+',\'max\',this.value)">';
+  if(t.rule==='random') return '<label>池/挑</label><div style="display:flex;gap:6px"><input type="number" min="1" value="'+(t.max||20)+'" onchange="setF('+i+',\'max\',this.value)" style="width:70px"><input type="number" min="1" value="'+(t.n||1)+'" onchange="setF('+i+',\'n\',this.value)" style="width:70px"></div>';
+  if(t.rule==='date') return '<label>日期</label><input type="date" value="'+(t.date||'')+'" onchange="setF('+i+',\'date\',this.value)">';
+  if(t.rule==='range') return '<label>起止</label><div style="display:flex;gap:6px"><input type="date" value="'+(t.from||'')+'" onchange="setF('+i+',\'from\',this.value)"><input type="date" value="'+(t.to||'')+'" onchange="setF('+i+',\'to\',this.value)"></div>';
+  if(t.rule==='bvids') return '<label>BV 号（逗号分隔）</label><input value="'+((t.bvids||[]).join(','))+'" onchange="setF('+i+',\'bvids\',this.value.split(/[,，\\s]+/))">';
+  return '';
+}
+function targetCard(t,i){
+  var ruleOpts=[['latest','最新 N 个'],['all','全部（最多 N 个）'],['random','随机 N 个'],['date','指定日期'],['range','时间段'],['bvids','指定 BV 号']];
+  return '<div class="tgt" data-i="'+i+'">'
+   +'<div class="hd"><b>'+BP.esc(t.name||('UID '+t.uid))+'</b>'
+   +(t.uid?'<span class="tag gray">UID '+BP.esc(t.uid)+'</span>':'<span class="tag gray">我的账号</span>')
+   +'<span class="x" onclick="delTgt('+i+')">×</span></div>'
+   +'<div class="grid3">'
+   +'<div><label>视频范围</label><select onchange="setRule('+i+',this.value)">'
+   +ruleOpts.map(function(o){return '<option value="'+o[0]+'"'+(t.rule===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join('')
+   +'</select></div>'
+   +'<div id="p-'+i+'">'+ruleParams(t,i)+'</div>'
+   +'</div>'
+   +'<div style="margin-top:8px" class="hint">命中规则：'+ruleDesc(t)+'</div>'
+   +'</div>';
+}
+function renderTgt(){
+  document.getElementById('targets').innerHTML=TGT.length?TGT.map(targetCard).join(''):'<p class="hint">还没有目标，点下面「＋ 我的账号」或「＋ 指定 UID」。</p>';
+}
+function setRule(i,v){
+  TGT[i].rule=v;
+  if(v==='random'&&!TGT[i].max)TGT[i].max=20;
+  if(v==='random'&&!TGT[i].n)TGT[i].n=1;
+  renderTgt();
+}
+function setF(i,k,v){
+  if(k==='bvids') TGT[i].bvids=(v||[]).map(function(x){return x.trim()}).filter(Boolean);
+  else if(k==='max'){ var d=(TGT[i].rule==='random'?20:(TGT[i].rule==='latest'?1:10)); TGT[i].max=parseInt(v||d); }
+  else if(k==='n') TGT[i].n=parseInt(v||1);
+  else TGT[i][k]=v;
+  renderTgt();
+}
+function delTgt(i){ TGT.splice(i,1); renderTgt(); }
+document.getElementById('addMine').onclick=function(){
+  ACCS.forEach(function(a){ TGT.push({uid:String(a.mid),name:accName(a),rule:'latest',max:1}); });
+  renderTgt();
+};
+document.getElementById('addUid').onclick=function(){
+  var uid=prompt('输入对方 B 站 UID（数字）'); if(!uid) return;
+  var name=prompt('备注名（可空）')||('UID '+uid);
+  TGT.push({uid:uid.trim(),name:name,rule:'latest',max:1}); renderTgt();
+};
+document.getElementById('preview').onclick=async function(){
+  var box=document.getElementById('pv'); box.innerHTML='<p class="hint">查询中…</p>';
+  try{
+    var r=await BP.api('/api/tasks/preview',{method:'POST',body:JSON.stringify({targets:TGT})});
+    box.innerHTML=r.results.map(function(x){
+      return '<div style="margin-bottom:10px"><b>'+BP.esc(x.uid||'')+'</b> 命中 '+x.count+' 个：<div class="hint">'
+        +x.videos.map(function(v){return BP.esc(v.date)+' '+BP.esc(v.bvid)+' '+BP.esc(v.title)}).join('<br>')
+        +'</div></div>';
+    }).join('')||'<p class="hint">无结果</p>';
+  }catch(e){ box.innerHTML='<p class="hint">'+BP.esc(e.message)+'</p>'; }
+};
+
+/* ---- ③ 动作 ---- */
+function on(k){ var e=document.querySelector('input[data-on="'+k+'"]'); return e&&e.checked; }
+function renderEmotes(){
+  var box=document.getElementById('cmt-emotes'); if(!box) return;
+  box.innerHTML=EMOTE_LIST.map(function(e){
+    return '<span class="chip '+(EMOTES_SEL.indexOf(e)>=0?'on':'')+'" data-v="'+e+'">'+e+'</span>';
+  }).join('');
+  box.querySelectorAll('.chip').forEach(function(c){
+    c.onclick=function(){
+      var v=c.getAttribute('data-v'), i=EMOTES_SEL.indexOf(v);
+      if(i>=0) EMOTES_SEL.splice(i,1); else EMOTES_SEL.push(v);
+      renderEmotes();
+    };
+  });
+}
+function syncOpusRows(){
+  var rr=document.getElementById('opus-repost-row'),
+      rt=document.getElementById('opus-repost-text-row'),
+      cr=document.getElementById('opus-cmt-row');
+  var hasRep=OPUS_SEL.indexOf('repost')>=0;
+  if(rr) rr.style.display=hasRep?'':'none';
+  if(rt) rt.style.display=hasRep?'':'none';
+  if(cr) cr.style.display=OPUS_SEL.indexOf('comment')>=0?'':'none';
+}
+function renderOpusRep(){
+  document.querySelectorAll('#opus-rep-mode .chip').forEach(function(c){
+    c.classList.toggle('on',c.getAttribute('data-v')===OPUS_REP_MODE);
+    c.onclick=function(){ OPUS_REP_MODE=c.getAttribute('data-v'); renderOpusRep(); };
+  });
+}
+function renderOpus(){
+  var box=document.getElementById('opus-acts'); if(!box) return;
+  box.innerHTML=[['like','点赞'],['repost','转发'],['comment','评论']].map(function(p){
+    return '<span class="chip '+(OPUS_SEL.indexOf(p[0])>=0?'on':'')+'" data-v="'+p[0]+'">'+p[1]+'</span>';
+  }).join('');
+  box.querySelectorAll('.chip').forEach(function(c){
+    c.onclick=function(){
+      var v=c.getAttribute('data-v'), i=OPUS_SEL.indexOf(v);
+      if(i>=0) OPUS_SEL.splice(i,1); else OPUS_SEL.push(v);
+      renderOpus();
+    };
+  });
+  renderOpusRep(); syncOpusRows();
+}
+function actions(){
+  var a={};
+  if(on('like')) a.like=true;
+  if(on('coin')) a.coin={on:true,multiply:parseInt(CHIPV.coinNum||1),also_like:document.getElementById('coin-like').checked};
+  if(on('fav')) a.fav={on:true,media_id:document.getElementById('fav-folder').value?parseInt(document.getElementById('fav-folder').value):null};
+  if(on('comment')) a.comment={on:true,text:document.getElementById('cmt').value,emotes:EMOTES_SEL.slice(),emote:document.getElementById('cmt-emote').checked};
+  if(on('share')) a.share={on:true,mode:CHIPV.shareMode,text:document.getElementById('share-text').value};
+  if(on('follow')) a.follow={on:true};
+  if(on('play')) a.play={on:true};
+  if(on('opus')) a.opus={on:true,max:parseInt(document.getElementById('opus-max').value||5),
+    like:OPUS_SEL.indexOf('like')>=0,
+    repost:{on:OPUS_SEL.indexOf('repost')>=0,mode:OPUS_REP_MODE,text:document.getElementById('opus-repost-text').value},
+    comment:{on:OPUS_SEL.indexOf('comment')>=0,text:document.getElementById('opus-cmt-text').value,emotes:[],emote:false}};
+  return a;
+}
+function cfg(){
+  return {actions:actions(), actors:actorSel.all?'all':actorSel.ids, targets:TGT,
+          sleep:[parseInt(document.getElementById('sleep-min').value||3),
+                 parseInt(document.getElementById('sleep-max').value||7)]};
+}
+
+document.getElementById('runBtn').onclick=async function(){
+  var c=cfg();
+  if(!Object.keys(c.actions).length){ BP.toast('请至少勾选一个动作','err'); return; }
+  if(!c.targets.length){ BP.toast('请至少添加一个目标','err'); return; }
+  this.disabled=true;
+  try{
+    var r=await BP.api('/api/tasks/run',{method:'POST',body:JSON.stringify(c)});
+    BP.toast('已开始执行，去「日志」看进度');
+    setTimeout(function(){ location.href='/logs'; }, 800);
+  }catch(e){ BP.toast(e.message,'err'); }
+  this.disabled=false;
+};
+
+function closeModal(){ document.getElementById('cronModal').classList.remove('show'); }
+document.getElementById('cronBtn').onclick=function(){
+  if(!TGT.length){ BP.toast('请先添加目标','err'); return; }
+  document.getElementById('cronModal').classList.add('show');
+};
+document.getElementById('cronSave').onclick=async function(){
+  var type=document.getElementById('cron-type').value;
+  var expr;
+  if(type==='daily'){
+    var t=(document.getElementById('cron-time').value||'09:00').split(':');
+    expr=parseInt(t[1]||0)+' '+parseInt(t[0]||9)+' * * *';
+  }else{
+    var n=parseInt(document.getElementById('cron-n').value||3);
+    expr='0 */'+n+' * * *';
+  }
+  try{
+    await BP.api('/api/tasks',{method:'POST',body:JSON.stringify({
+      name:document.getElementById('cron-name').value||'每日互赞',
+      cron:expr, kind:'interact', config:cfg(), enabled:true})});
+    BP.toast('已保存为定时任务'); closeModal();
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+
+/* ---- 模板 ---- */
+async function loadTpls(){
+  try{
+    var d=await BP.api('/api/templates?kind=interact');
+    window._tpls=d.templates||[];
+    document.getElementById('tpl-pick').innerHTML='<option value="">— 载入互赞模板 —</option>'
+      +window._tpls.map(function(t){return '<option value="'+t.id+'">'+BP.esc(t.name)+'</option>'}).join('');
+  }catch(e){}
+}
+document.getElementById('tpl-pick').onchange=function(){
+  var id=this.value; if(!id) return;
+  var t=null; (window._tpls||[]).forEach(function(x){ if(String(x.id)===id) t=x; });
+  if(t){ applyCfg(t.config); BP.toast('已载入模板：'+t.name); }
+  this.value='';
+};
+document.getElementById('tpl-save').onclick=async function(){
+  if(!Object.keys(actions()).length){ BP.toast('请先勾选动作','err'); return; }
+  var n=prompt('模板名称','互赞模板'); if(!n) return;
+  try{
+    await BP.api('/api/templates',{method:'POST',body:JSON.stringify({name:n,kind:'interact',config:cfg()})});
+    BP.toast('已存为模板'); loadTpls();
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+function applyCfg(c){
+  if(!c) return;
+  if(c.actions){
+    ['like','coin','fav','comment','share','follow','play','opus'].forEach(function(k){
+      var cb=document.querySelector('input[data-on="'+k+'"]');
+      if(!cb) return;
+      var v=c.actions[k];
+      var checked = k==='like' ? !!v : !!(v && (v===true || v.on));
+      cb.checked=checked;
+      cb.dispatchEvent(new Event('change'));
+    });
+  }
+  if(c.sleep){ document.getElementById('sleep-min').value=c.sleep[0]||3; document.getElementById('sleep-max').value=c.sleep[1]||7; }
+  if(c.actors){ actorSel=(c.actors==='all')?{all:true,ids:[]}:{all:false,ids:c.actors.slice()}; }
+  renderActors();
+  if(c.targets&&c.targets.length){ TGT=c.targets.slice(); renderTgt(); }
+}
+
+/* ---- 初始化 ---- */
+BP.api('/api/accounts').then(function(d){
+  ACCS=d.accounts||[];
+  renderEmotes(); renderOpus();
+  if(ACCS.length){ ACCS.forEach(function(a){ TGT.push({uid:String(a.mid),name:accName(a),rule:'latest',max:1}); }); }
+  renderActors(); renderTgt();
+  loadTpls().then(function(){
+    var t=new URLSearchParams(location.search).get('tpl');
+    if(t){ (window._tpls||[]).forEach(function(x){ if(String(x.id)===t) applyCfg(x.config); }); }
+  });
+}).catch(function(e){ BP.toast(e.message,'err'); });
+</script>
+{% endblock %}

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fb7299">
+<title>{% block title %}总览{% endblock %} · {{ APP_NAME }}</title>
+<link rel="icon" href="/static/img/nodata.png">
+<link rel="stylesheet" href="/static/css/app.css?v={{ CSS_V }}">
+<link rel="stylesheet" href="/static/css/client.css?v={{ CSS_V }}">
+<link rel="stylesheet" href="/static/css/custom.css?v={{ CSS_V }}">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="/?home=1"><img src="/static/img/bili_logo.svg" alt="哔哩哔哩"><span class="site-nm">{{ APP_NAME }}</span></a>
+    <nav class="mainnav">
+      <a href="/dashboard" data-nav="/dashboard" class="{% if nav=='dashboard' %}active{% endif %}">总览</a>
+      <a href="/ai" data-nav="/ai" class="{% if nav=='ai' %}active{% endif %}">AI 助手</a>
+      <a href="/accounts" data-nav="/accounts" class="{% if nav=='accounts' %}active{% endif %}">账号</a>
+      <a href="/publish" data-nav="/publish" class="{% if nav=='publish' %}active{% endif %}">投稿</a>
+      <a href="/messages" data-nav="/messages" class="{% if nav=='messages' %}active{% endif %}">私信</a>
+      <a href="/tasks" data-nav="/tasks" class="{% if nav=='tasks' %}active{% endif %}">互赞</a>
+      <a href="/scheduler" data-nav="/scheduler" class="{% if nav=='scheduler' %}active{% endif %}">任务</a>
+      
+      <a href="/logs" data-nav="/logs" class="{% if nav=='logs' %}active{% endif %}">日志</a>
+      <a href="/settings" data-nav="/settings" class="{% if nav=='settings' %}active{% endif %}">设置</a>
+    </nav>
+    <div class="usermenu">
+      <a class="bell" href="/ai" data-nav="/ai" title="AI 助手">🤖</a>
+      <a class="bell" href="/notices" data-nav="/notices" title="消息通知">🔔<i class="bdot" id="bellDot"></i></a>
+      
+      <a class="me-link" href="/me" data-nav="/me" title="我的">{{ user.username[0]|upper }}</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+<nav class="tabbar">
+  <a href="/dashboard" class="{% if nav=='dashboard' %}on{% endif %}">总览</a>
+  <a href="/accounts" class="{% if nav=='accounts' %}on{% endif %}">账号</a>
+  <a href="/tasks" class="{% if nav=='tasks' %}on{% endif %}">互赞</a>
+  <a href="/ai" class="{% if nav=='ai' %}on{% endif %}">AI 助手</a>
+  <a href="/settings" class="{% if nav=='settings' %}on{% endif %}">我的</a>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script src="/static/js/common.js"></script>
+<script>
+/* ---- 顶栏公共逻辑：与原站 block1 一致 ---- */
+(function(){
+  var lo=document.getElementById('logout');
+  if(lo) lo.onclick=async function(e){
+    e.preventDefault();
+    try{ await BP.api('/api/auth/logout',{method:'POST'}); }catch(x){}
+    location.href='/login';
+  };
+  var bd=document.getElementById('bellDot');
+  if(bd){
+    var tick=async function(){
+      try{
+        var n=await BP.api('/api/notices/count');
+        if(n && n.unread>0){ bd.textContent = n.unread>99?'99+':n.unread; bd.classList.add('on'); }
+        else { bd.textContent=''; bd.classList.remove('on'); }
+      }catch(e){}
+    };
+    tick(); setInterval(tick, 60000);
+  }
+  var vc=document.getElementById('vipchip');
+  if(vc){
+}
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,634 @@
+{% extends "base.html" %}
+{% set nav = 'scheduler' %}
+{% block title %}任务{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>任务</h1>
+  <div class="spacer"></div>
+  <button class="btn ghost sm" id="aiBtn">AI 任务</button>
+  <button class="btn ghost sm" id="monBtn">实时监控</button>
+  <button class="btn ghost sm" onclick="AUTO_SHOW('autodm')">自动私信</button>
+  <button class="btn ghost sm" onclick="AUTO_SHOW('autoreply')">AI 自动回复</button>
+  <button class="btn ghost sm" onclick="AUTO_SHOW('autocomment')">评论回复</button>
+  <button class="btn sm" id="newBtn">＋ 新建任务</button>
+</div>
+
+<div id="lockbar"></div>
+
+<div class="searchbar">
+  <span class="s-ic">🔍</span>
+  <input id="tq" type="search" placeholder="搜索任务名称 / 类型" autocomplete="off" enterkeyhint="search">
+  <button class="clr" id="tqclr" type="button" aria-label="清空">✕</button>
+</div>
+
+<div class="card">
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>名称</th><th>类型</th><th>频率</th><th>内容</th><th>上次执行</th><th>下次执行</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody id="list"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="clp-more" id="listMore"></div>
+</div>
+
+<div class="card au-card" id="autoCard" style="display:none;margin-top:14px">
+  <div class="card-hd"><i class="dot"></i>自动化规则 <span class="hint" id="au-policy" style="margin-left:8px"></span>
+    <span style="flex:1"></span>
+    <button class="btn ghost sm" id="au-close">收起</button>
+  </div>
+  <div class="card-bd">
+    <div class="seg" id="au-kind">
+      <button data-v="autodm">自动私信</button>
+      <button data-v="autoreply">AI 自动回复私信</button>
+      <button data-v="autocomment">评论自动回复</button>
+    </div>
+    <p class="hint" id="au-desc" style="margin:12px 0 10px"></p>
+    <div id="au-list"><p class="hint">加载中…</p></div>
+    <div style="margin-top:12px"><button class="btn ghost sm" id="au-add">＋ 新建规则</button></div>
+
+    <div id="au-form" style="display:none;margin-top:14px;border-top:1px dashed #e6e8ec;padding-top:14px">
+      <div class="grid2">
+        <div class="field"><label>执行账号</label><select id="au-acc"></select></div>
+        <div class="field"><label>检查间隔（分钟）<span class="hint" id="au-iv-hint"></span></label>
+          <input id="au-iv" type="number" value="60" min="1"></div>
+      </div>
+
+      <div class="au-sec" data-au="autodm">
+        <div class="field"><label>私信对象</label>
+          <div class="seg" id="au-dm-scope">
+            <button data-v="new" class="on">仅新粉丝</button>
+            <button data-v="all">所有粉丝</button>
+            <button data-v="uid">仅指定人</button>
+          </div>
+        </div>
+        <div class="field" id="au-dm-uidrow" style="display:none"><label>指定 UID（一行一个 / 逗号分隔）</label>
+          <textarea id="au-dm-uids" rows="2" placeholder="123456"></textarea></div>
+        <div class="field"><label>私信内容（<b>{name}</b> = 昵称，<b>{uid}</b> = UID）</label>
+          <textarea id="au-dm-tpl" rows="3" placeholder="感谢关注～有问题随时私信我"></textarea></div>
+        <div class="grid2">
+          <div class="field"><label>黑名单 UID（永不私信）</label>
+            <textarea id="au-dm-bl" rows="2" placeholder="654321"></textarea></div>
+          <div class="field"><label>每次最多发几条</label>
+            <input id="au-dm-max" type="number" value="5" min="1" max="20"></div>
+        </div>
+      </div>
+
+      <div class="au-sec" data-au="autoreply" style="display:none">
+        <div class="field"><label>回复范围</label>
+          <div class="seg" id="au-ar-mode">
+            <button data-v="all" class="on">所有人</button>
+            <button data-v="fans">仅粉丝</button>
+            <button data-v="whitelist">仅指定人</button>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="field" id="au-ar-wlrow" style="display:none"><label>白名单 UID</label>
+            <textarea id="au-ar-wl" rows="2" placeholder="123456"></textarea></div>
+          <div class="field"><label>黑名单 UID（始终排除）</label>
+            <textarea id="au-ar-bl" rows="2" placeholder="654321"></textarea></div>
+        </div>
+        <div class="field"><label>额外屏蔽词（逗号分隔）</label>
+          <input id="au-ar-bw" type="text" placeholder="如：代练,收号"></div>
+        <div class="grid2" style="grid-template-columns:repeat(2,1fr)">
+          <div class="field"><label>同一人冷却（分钟）</label><input id="au-ar-cd" type="number" value="120" min="1"></div>
+          <div class="field"><label>每次最多回复</label><input id="au-ar-max" type="number" value="3" min="1"></div>
+        </div>
+      </div>
+
+      <div class="au-sec" data-au="autocomment" style="display:none">
+        <div class="field"><label>回复内容模板（<b>{name}</b> = 评论者昵称）</label>
+          <textarea id="au-cm-tpl" rows="3" placeholder="感谢支持～"></textarea></div>
+        <div class="grid2">
+          <div class="field"><label>黑名单 UID</label><textarea id="au-cm-bl" rows="2" placeholder="654321"></textarea></div>
+          <div class="field"><label>每次最多回复</label><input id="au-cm-max" type="number" value="5" min="1"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn" id="au-save">保存规则</button>
+        <button class="btn ghost" onclick="document.getElementById('au-form').style.display='none'">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 新建/编辑任务弹窗 -->
+<div class="modal-mask" id="modal">
+  <div class="modal" style="max-width:780px">
+    <div class="hd" id="m-title">新建任务<span class="x" onclick="closeM()">×</span></div>
+    <div class="bd">
+      <div class="field"><label>任务名称</label><input id="m-name" type="text" value="我的定时任务"></div>
+      <div class="field"><label>任务类型</label>
+        <div class="seg" id="m-kind">
+          <button data-v="interact" class="on">互赞（点赞/投币/收藏/评论/分享/关注/播放）</button>
+          <button data-v="upload">投稿（定时发布视频）</button>
+        </div>
+      </div>
+
+      <div class="field"><label>执行频率</label>
+        <select id="m-crontype">
+          <option value="daily">每天固定时间</option>
+          <option value="hourly">每隔 N 小时</option>
+        </select>
+      </div>
+      <div class="field" id="m-row-daily"><label>每天几点</label><input id="m-crontime" type="time" value="09:00"></div>
+      <div class="field" id="m-row-hourly" style="display:none"><label>每隔几小时</label>
+        <select id="m-cronn"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>6</option><option>8</option><option>12</option></select>
+      </div>
+
+      <div id="box-interact">
+        <div class="field"><label>使用模板（互赞模板，选后自动填动作/目标）</label>
+          <select id="i-tpl"><option value="">— 不使用模板 —</option></select></div>
+        <p class="sub">执行账号</p>
+        <div class="pick" style="gap:8px;margin-bottom:8px">
+          <button class="btn ghost sm" type="button" id="m-actors-toggle">收起</button>
+          <span class="clp-sum" id="m-actors-sum"></span>
+        </div>
+        <div class="pick" id="m-actors"></div>
+        <p class="sub" style="margin-top:14px">目标</p>
+        <div id="m-targets"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="btn ghost sm" id="m-addMine">＋ 我的账号</button>
+          <button class="btn ghost sm" id="m-addUid">＋ 指定 UID</button>
+        </div>
+        <p class="sub">动作</p>
+        <div class="acts" id="m-acts">
+          <div class="act on" data-act="like"><div class="act-hd"><span class="ico">👍</span><label class="switch" style="margin:0"><input type="checkbox" data-on="like" checked> 点赞</label></div></div>
+          <div class="act" data-act="coin"><div class="act-hd"><span class="ico">🪙</span><label class="switch" style="margin:0"><input type="checkbox" data-on="coin"> 投币</label></div>
+            <div class="act-sub"><div class="row"><label>数量</label><div class="chips" id="m-coin-num"><span class="chip on" data-v="1">1 币</span><span class="chip" data-v="2">2 币</span></div></div>
+            <div class="row"><label class="switch"><input type="checkbox" id="m-coin-like"> 同时点赞</label></div></div></div>
+          <div class="act" data-act="fav"><div class="act-hd"><span class="ico">⭐</span><label class="switch" style="margin:0"><input type="checkbox" data-on="fav"> 收藏</label></div>
+            <div class="act-sub"><div class="row"><label>收藏夹 media_id（留空自动）</label><input id="m-fav-folder" type="number"></div></div></div>
+          <div class="act" data-act="comment"><div class="act-hd"><span class="ico">💬</span><label class="switch" style="margin:0"><input type="checkbox" data-on="comment"> 评论</label></div>
+            <div class="act-sub"><div class="row"><label>内容</label><input id="m-cmt" type="text" value="主播我爱你"></div>
+            <div class="row"><label>表情包（可多选）</label><div class="chips" id="m-cmt-emotes"></div></div>
+            <div class="row"><label class="switch"><input type="checkbox" id="m-cmt-emote"> 未选表情时随机附一个</label></div></div></div>
+          <div class="act" data-act="share"><div class="act-hd"><span class="ico">↗</span><label class="switch" style="margin:0"><input type="checkbox" data-on="share"> 分享</label></div>
+            <div class="act-sub"><div class="row"><label>方式</label><div class="chips" id="m-share-mode"><span class="chip on" data-v="normal">隐形</span><span class="chip" data-v="dynamic">转发动态</span></div></div>
+            <div class="row" id="m-share-row" style="display:none"><label>动态文案</label><input id="m-share-text" type="text" value="转发视频"></div></div></div>
+          <div class="act" data-act="follow"><div class="act-hd"><span class="ico">➕</span><label class="switch" style="margin:0"><input type="checkbox" data-on="follow"> 关注</label></div></div>
+          <div class="act" data-act="play"><div class="act-hd"><span class="ico">▶</span><label class="switch" style="margin:0"><input type="checkbox" data-on="play"> 刷播放</label></div></div>
+          <div class="act" data-act="opus"><div class="act-hd"><span class="ico">📝</span><label class="switch" style="margin:0"><input type="checkbox" data-on="opus"> 图文</label></div>
+            <div class="act-sub">
+              <div class="row"><label>每个目标处理几条图文</label><input id="m-opus-max" type="number" value="5" min="1"></div>
+              <div class="row"><label>操作（可多选）</label><div class="chips" id="m-opus-acts"><span class="chip on" data-v="like">点赞</span><span class="chip" data-v="repost">转发</span><span class="chip" data-v="comment">评论</span></div></div>
+              <div class="row" id="m-opus-rep-row" style="display:none"><label>转发方式</label><div class="chips" id="m-opus-rep-mode"><span class="chip on" data-v="normal">正常转发</span><span class="chip" data-v="hidden">隐形转发</span></div></div>
+              <div class="row" id="m-opus-rep-text-row" style="display:none"><label>转发文案</label><input id="m-opus-rep-text" type="text" value="转发动态"></div>
+              <div class="row" id="m-opus-cmt-row" style="display:none"><label>评论文案</label><input id="m-opus-cmt-text" type="text" value="好内容，支持一下"></div>
+            </div></div>
+        </div>
+        <div class="field" style="margin-top:12px;max-width:240px"><label>动作间隔（秒）</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="m-smin" type="number" value="3" style="width:80px"><span class="hint">~</span><input id="m-smax" type="number" value="7" style="width:80px">
+          </div>
+        </div>
+      </div>
+
+      <div id="box-upload" style="display:none">
+        <div class="grid2">
+          <div class="field"><label>投稿账号</label><select id="u-account"></select></div>
+          <div class="field"><label>视频文件（服务器视频库）</label><select id="u-file"></select></div>
+        </div>
+        <div class="field"><label>视频封面（可选）</label>
+          <input id="u-cover" type="text" placeholder="B 站封面链接，或封面库编号（如 3）">
+          <p class="hint">留空则用 B 站默认封面。</p>
+        </div>
+        <div class="field"><label>标题（留空用文件名）</label><input id="u-title" type="text"></div>
+        <div class="grid2">
+          <div class="field"><label>分区</label><select id="u-tid"></select></div>
+          <div class="field"><label>标签</label><input id="u-tag" type="text"></div>
+        </div>
+        <div class="field"><label>简介</label><textarea id="u-desc"></textarea></div>
+        <div class="pick" style="gap:16px">
+          <label class="switch"><input type="checkbox" id="u-danmu"> 关闭弹幕</label>
+          <label class="switch"><input type="checkbox" id="u-reply"> 关闭评论</label>
+          <label class="switch"><input type="checkbox" id="u-sel"> 精选评论</label>
+          <label class="switch"><input type="checkbox" id="u-noreprint"> 禁止转载</label>
+        </div>
+      </div>
+
+    </div>
+    <div class="ft"><button class="btn ghost" onclick="closeM()">取消</button><button class="btn" id="m-save">保存</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+var ACCS=[], MSEL={all:true,ids:[]}, MTGT=[], MKIND='interact', EDIT_ID=null;
+var CHIP={coinNum:1,shareMode:'normal'};
+var M_EMOTES=[], M_OPUS=['like'], M_OPUS_REP='normal';
+var EMOTE_LIST=['[doge]','[大笑]','[星星眼]','[打call]','[妙啊]','[吃瓜]','[惊喜]','[点赞]','[呲牙]','[辣眼睛]','[尴尬]','[疼]'];
+var AU={kind:'autodm', policy:null, editId:null};
+
+function cronText(c){
+  if(!c) return '—';
+  var p=c.split(' ');
+  if(p[1]&&p[1].indexOf('*/')===0) return '每 '+p[1].slice(2)+' 小时';
+  if(p[2]==='*'&&p[3]==='*'&&p[4]==='*') return '每天 '+String(p[1]).padStart(2,'0')+':'+String(p[0]).padStart(2,'0');
+  return c;
+}
+function curCron(){
+  var type=document.getElementById('m-crontype').value;
+  if(type==='daily'){
+    var t=(document.getElementById('m-crontime').value||'09:00').split(':');
+    return parseInt(t[1]||0)+' '+parseInt(t[0]||9)+' * * *';
+  }
+  return '0 */'+parseInt(document.getElementById('m-cronn').value||3)+' * * *';
+}
+
+/* ================= 任务列表 ================= */
+async function loadList(){
+  var d=await BP.api('/api/tasks');
+  window._tasks=d.tasks||[];
+  renderList();
+}
+function renderList(){
+  var tb=document.getElementById('list');
+  var all=window._tasks||[];
+  var q=(document.getElementById('tq').value||'').trim().toLowerCase();
+  document.getElementById('tqclr').style.display=q?'block':'none';
+  var list=all.filter(function(t){
+    if(!q) return true;
+    return ((t.name||'')+' '+(t.kind==='upload'?'投稿 上传':'互赞')+' '+(t.cron||'')).toLowerCase().indexOf(q)>=0;
+  });
+  if(!all.length){
+    tb.innerHTML='<tr><td colspan="8" class="empty">还没有定时任务，建一个让它每天自己跑吧</td></tr>'; return;
+  }
+  if(!list.length){ tb.innerHTML='<tr><td colspan="8" class="empty">没有匹配的任务，换个关键词试试。</td></tr>'; return; }
+  tb.innerHTML=list.map(function(t){
+    var info = t.kind==='upload'
+      ? ('投稿 · '+(((t.config||{}).title)||((t.config||{}).file_name)||''))
+      : (Object.keys((t.config||{}).actions||{}).length+' 个动作');
+    return '<tr><td><b>'+BP.esc(t.name)+'</b></td>'
+      +'<td>'+(t.kind==='upload'?'<span class="tag blue">投稿</span>':'<span class="tag pink">互赞</span>')+'</td>'
+      +'<td>'+BP.esc(cronText(t.cron))+'</td>'
+      +'<td class="hint">'+BP.esc(info)+'</td>'
+      +'<td class="hint">'+BP.esc(t.last_run_at||'—')+'</td>'
+      +'<td class="hint">'+BP.esc(t.next_run_at||'—')+'</td>'
+      +'<td>'+(t.enabled?'<span class="tag ok">启用</span>':'<span class="tag gray">停用</span>')+'</td>'
+      +'<td nowrap><button class="btn ghost sm" onclick="edit('+t.id+')">编辑</button> '
+      +'<button class="btn ghost sm" onclick="toggle('+t.id+','+(t.enabled?0:1)+')">'+(t.enabled?'停用':'启用')+'</button> '
+      +'<button class="btn ghost sm" onclick="runNow('+t.id+')">执行</button> '
+      +'<button class="btn danger sm" onclick="del('+t.id+')">删除</button></td></tr>';
+  }).join('');
+}
+document.getElementById('tq').addEventListener('input',renderList);
+document.getElementById('tqclr').addEventListener('click',function(){document.getElementById('tq').value='';renderList();});
+async function toggle(id,v){ await BP.api('/api/tasks/'+id,{method:'PATCH',body:JSON.stringify({enabled:v})}); loadList(); }
+async function del(id){ if(!confirm('删除该定时任务？'))return; await BP.api('/api/tasks/'+id,{method:'DELETE'}); BP.toast('已删除'); loadList(); }
+async function runNow(id){
+  var task=(window._tasks||[]).filter(function(x){return x.id===id})[0]||{};
+  try{
+    if(task.kind==='upload'){
+      // 投稿任务：先预检，通过再真跑
+      var pre=await BP.api('/api/publish/run-upload',{method:'POST',body:JSON.stringify({task_id:id,dry_run:true})});
+      if(!pre.ok){ BP.toast('不能执行：'+(pre.errors||[]).join('；'),'err'); return; }
+      var p=pre.planned||{};
+      if(!confirm('即将投稿：\n账号 '+(p.account||'')+'\n文件 '+(p.file||'')+'（'+p.size_h+' MB）\n标题 '+(p.title||'')+'\n消耗流量 '+p.cost_mb+' MB\n\n继续？')) return;
+      var r=await BP.api('/api/publish/run-upload',{method:'POST',body:JSON.stringify({task_id:id})});
+      BP.toast(r.message||(r.ok?'已提交':'失败'), r.ok?'':'err');
+      loadList(); return;
+    }
+    var r2=await BP.api('/api/tasks/'+id+'/run',{method:'POST'});
+    BP.toast(r2.message||'已开始执行');
+    setTimeout(function(){location.href='/logs';},700);
+  }catch(e){ BP.toast(e.message,'err'); }
+}
+function closeM(){ document.getElementById('modal').classList.remove('show'); }
+document.getElementById('newBtn').onclick=function(){ openM(null); };
+
+document.getElementById('m-crontype').onchange=function(){
+  document.getElementById('m-row-daily').style.display=this.value==='daily'?'':'none';
+  document.getElementById('m-row-hourly').style.display=this.value==='hourly'?'':'none';
+};
+document.querySelectorAll('#m-kind button').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('#m-kind button').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on'); MKIND=b.getAttribute('data-v');
+    document.getElementById('box-interact').style.display = MKIND==='interact'?'':'none';
+    document.getElementById('box-upload').style.display = MKIND==='upload'?'':'none';
+  };
+});
+
+/* ================= 弹窗：账号 / 目标 / 动作 ================= */
+function mActorSummary(){
+  if(!ACCS.length) return '';
+  if(MSEL.all) return '全部 '+ACCS.length+' 个账号';
+  if(!MSEL.ids.length) return '未选账号，点「展开」选择';
+  if(MSEL.ids.length===ACCS.length) return '已选全部 '+ACCS.length+' 个账号';
+  return '已选 '+MSEL.ids.length+' 个';
+}
+function renderMact(){
+  document.getElementById('m-actors').innerHTML=
+    '<span class="chip '+(MSEL.all?'on':'')+'" data-all="1">全部账号</span>'+
+    ACCS.map(function(a){return '<span class="chip '+(MSEL.ids.indexOf(a.id)>=0?'on':'')+'" data-id="'+a.id+'">'+BP.esc(accName(a))+' ('+BP.esc(accMid(a))+')</span>';}).join('');
+  document.querySelectorAll('#m-actors .chip').forEach(function(c){
+    c.onclick=function(){
+      if(c.getAttribute('data-all')){ MSEL.all=!MSEL.all; MSEL.ids=[]; }
+      else{ var id=parseInt(c.getAttribute('data-id')); var i=MSEL.ids.indexOf(id);
+            if(i>=0) MSEL.ids.splice(i,1); else MSEL.ids.push(id); MSEL.all=false; }
+      renderMact();
+    };
+  });
+  document.getElementById('m-actors-sum').textContent=mActorSummary();
+}
+document.getElementById('m-actors-toggle').onclick=function(){
+  var box=document.getElementById('m-actors');
+  var hide=box.style.display!=='none';
+  box.style.display=hide?'none':'';
+  this.textContent=hide?'展开':'收起';
+};
+function mRuleDesc(t){
+  if(t.rule==='latest') return '最新 '+(t.max||1)+' 个';
+  if(t.rule==='all') return '最多 '+(t.max||10)+' 个';
+  if(t.rule==='random') return '从 '+(t.max||20)+' 个里随机 '+(t.n||1)+' 个';
+  if(t.rule==='date') return '日期 '+(t.date||'未填');
+  if(t.rule==='range') return (t.from||'?')+' ~ '+(t.to||'?');
+  if(t.rule==='bvids') return '指定 '+((t.bvids||[]).length)+' 个 BV';
+  return '';
+}
+function renderMtgt(){
+  var box=document.getElementById('m-targets');
+  if(!MTGT.length){ box.innerHTML='<p class="hint">还没有目标。</p>'; return; }
+  box.innerHTML=MTGT.map(function(t,i){
+    var opts=[['latest','最新 N 个'],['all','全部'],['random','随机 N 个'],['date','指定日期'],['range','时间段'],['bvids','指定 BV']];
+    return '<div class="tgt"><div class="hd"><b>'+BP.esc(t.name||('UID '+t.uid))+'</b>'
+      +'<span class="tag gray">'+(t.uid?('UID '+BP.esc(t.uid)):'我的账号')+'</span>'
+      +'<span class="x" onclick="mDelTgt('+i+')">×</span></div>'
+      +'<div class="grid2"><div><label>范围</label><select onchange="mSetRule('+i+',this.value)">'
+      +opts.map(function(o){return '<option value="'+o[0]+'"'+(t.rule===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join('')
+      +'</select></div>'
+      +'<div><label>数量</label><input type="number" min="1" value="'+(t.max||1)+'" onchange="mSetMax('+i+',this.value)"></div></div>'
+      +'<div class="hint" style="margin-top:6px">命中：'+mRuleDesc(t)+'</div></div>';
+  }).join('');
+}
+function mSetRule(i,v){ MTGT[i].rule=v; if(v==='random'){ MTGT[i].max=MTGT[i].max||20; MTGT[i].n=MTGT[i].n||1; } renderMtgt(); }
+function mSetMax(i,v){ MTGT[i].max=parseInt(v||1); renderMtgt(); }
+function mDelTgt(i){ MTGT.splice(i,1); renderMtgt(); }
+document.getElementById('m-addMine').onclick=function(){
+  ACCS.forEach(function(a){ MTGT.push({uid:String(a.mid),name:accName(a),rule:'latest',max:1}); });
+  renderMtgt();
+};
+document.getElementById('m-addUid').onclick=function(){
+  var uid=prompt('输入对方 B 站 UID'); if(!uid) return;
+  MTGT.push({uid:uid.trim(),name:'UID '+uid,rule:'latest',max:1}); renderMtgt();
+};
+function mRenderEmotes(){
+  var box=document.getElementById('m-cmt-emotes'); if(!box) return;
+  box.innerHTML=EMOTE_LIST.map(function(e){
+    return '<span class="chip '+(M_EMOTES.indexOf(e)>=0?'on':'')+'" data-v="'+e+'">'+e+'</span>';
+  }).join('');
+  box.querySelectorAll('.chip').forEach(function(c){
+    c.onclick=function(){
+      var v=c.getAttribute('data-v'), i=M_EMOTES.indexOf(v);
+      if(i>=0) M_EMOTES.splice(i,1); else M_EMOTES.push(v);
+      mRenderEmotes();
+    };
+  });
+}
+function mSyncOpus(){
+  var r=document.getElementById('m-opus-rep-row'),
+      t=document.getElementById('m-opus-rep-text-row'),
+      c=document.getElementById('m-opus-cmt-row');
+  var has=M_OPUS.indexOf('repost')>=0;
+  if(r) r.style.display=has?'':'none';
+  if(t) t.style.display=has?'':'none';
+  if(c) c.style.display=M_OPUS.indexOf('comment')>=0?'':'none';
+}
+function mRenderOpus(){
+  var box=document.getElementById('m-opus-acts'); if(!box) return;
+  box.innerHTML=[['like','点赞'],['repost','转发'],['comment','评论']].map(function(p){
+    return '<span class="chip '+(M_OPUS.indexOf(p[0])>=0?'on':'')+'" data-v="'+p[0]+'">'+p[1]+'</span>';
+  }).join('');
+  box.querySelectorAll('.chip').forEach(function(c){
+    c.onclick=function(){
+      var v=c.getAttribute('data-v'), i=M_OPUS.indexOf(v);
+      if(i>=0) M_OPUS.splice(i,1); else M_OPUS.push(v);
+      mRenderOpus();
+    };
+  });
+  mSyncOpus();
+}
+document.querySelectorAll('#m-acts .act').forEach(function(a){
+  var cb=a.querySelector('input[data-on]');
+  if(cb) cb.onchange=function(){ a.classList.toggle('on',cb.checked); };
+});
+document.querySelectorAll('#m-coin-num .chip').forEach(function(c){
+  c.onclick=function(){ document.querySelectorAll('#m-coin-num .chip').forEach(function(x){x.classList.remove('on')}); c.classList.add('on'); CHIP.coinNum=c.getAttribute('data-v'); };
+});
+document.querySelectorAll('#m-share-mode .chip').forEach(function(c){
+  c.onclick=function(){
+    document.querySelectorAll('#m-share-mode .chip').forEach(function(x){x.classList.remove('on')});
+    c.classList.add('on'); CHIP.shareMode=c.getAttribute('data-v');
+    document.getElementById('m-share-row').style.display=CHIP.shareMode==='dynamic'?'':'none';
+  };
+});
+function mOn(k){ var e=document.querySelector('#m-acts input[data-on="'+k+'"]'); return e&&e.checked; }
+function readActions(){
+  var a={};
+  if(mOn('like')) a.like=true;
+  if(mOn('coin')) a.coin={on:true,multiply:parseInt(CHIP.coinNum||1),also_like:document.getElementById('m-coin-like').checked};
+  if(mOn('fav')) a.fav={on:true,media_id:document.getElementById('m-fav-folder').value?parseInt(document.getElementById('m-fav-folder').value):null};
+  if(mOn('comment')) a.comment={on:true,text:document.getElementById('m-cmt').value,emotes:M_EMOTES.slice(),emote:document.getElementById('m-cmt-emote').checked};
+  if(mOn('share')) a.share={on:true,mode:CHIP.shareMode,text:document.getElementById('m-share-text').value};
+  if(mOn('follow')) a.follow={on:true};
+  if(mOn('play')) a.play={on:true};
+  if(mOn('opus')) a.opus={on:true,max:parseInt(document.getElementById('m-opus-max').value||5),
+    like:M_OPUS.indexOf('like')>=0,
+    repost:{on:M_OPUS.indexOf('repost')>=0,mode:M_OPUS_REP,text:document.getElementById('m-opus-rep-text').value},
+    comment:{on:M_OPUS.indexOf('comment')>=0,text:document.getElementById('m-opus-cmt-text').value,emotes:[],emote:false}};
+  return a;
+}
+function applyInteractCfg(c){
+  c=c||{};
+  var acts=c.actions||{};
+  document.querySelectorAll('#m-acts input[data-on]').forEach(function(cb){
+    var k=cb.getAttribute('data-on'), v=acts[k];
+    var checked = k==='like' ? !!v : !!(v && (v===true||v.on));
+    cb.checked=checked;
+    cb.closest('.act') && cb.closest('.act').classList.toggle('on',checked);
+  });
+  if(c.sleep){ document.getElementById('m-smin').value=c.sleep[0]||3; document.getElementById('m-smax').value=c.sleep[1]||7; }
+  if(c.actors){ MSEL=(c.actors==='all')?{all:true,ids:[]}:{all:false,ids:c.actors.slice()}; }
+  renderMact();
+  MTGT=(c.targets||[]).slice(); renderMtgt();
+}
+
+function openM(t){
+  EDIT_ID=t?t.id:null;
+  document.getElementById('m-title').firstChild.nodeValue=(t?'编辑任务':'新建任务');
+  document.getElementById('m-name').value=t?t.name:'我的定时任务';
+  MKIND=t?(t.kind||'interact'):'interact';
+  document.querySelectorAll('#m-kind button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-v')===MKIND)});
+  document.getElementById('box-interact').style.display=MKIND==='interact'?'':'none';
+  document.getElementById('box-upload').style.display=MKIND==='upload'?'':'none';
+  var c=t?(t.config||{}):{};
+  applyInteractCfg(c);
+  document.getElementById('u-account').innerHTML=ACCS.map(function(a){
+    return '<option value="'+a.id+'"'+(c.account_id===a.id?' selected':'')+'>'+BP.esc(accName(a))+'</option>';
+  }).join('');
+  if(c.cron===undefined && t && t.cron){
+    var p=t.cron.split(' ');
+    if(p[1]&&p[1].indexOf('*/')===0){
+      document.getElementById('m-crontype').value='hourly';
+      document.getElementById('m-cronn').value=p[1].slice(2);
+      document.getElementById('m-crontype').onchange.call(document.getElementById('m-crontype'));
+    }else if(p[2]==='*'){
+      document.getElementById('m-crontype').value='daily';
+      document.getElementById('m-crontime').value=String(p[1]).padStart(2,'0')+':'+String(p[0]).padStart(2,'0');
+      document.getElementById('m-crontype').onchange.call(document.getElementById('m-crontype'));
+    }
+  }
+  document.getElementById('modal').classList.add('show');
+}
+function edit(id){ var t=(window._tasks||[]).filter(function(x){return x.id===id})[0]; if(t) openM(t); }
+
+document.getElementById('m-save').onclick=async function(){
+  var conf;
+  if(MKIND==='upload'){
+    conf={account_id:parseInt(document.getElementById('u-account').value||0),
+          file_id:document.getElementById('u-file').value,
+          cover:document.getElementById('u-cover').value,
+          title:document.getElementById('u-title').value,
+          tid:document.getElementById('u-tid').value,
+          tag:document.getElementById('u-tag').value,
+          desc:document.getElementById('u-desc').value,
+          no_danmu:document.getElementById('u-danmu').checked,
+          no_reply:document.getElementById('u-reply').checked,
+          selected:document.getElementById('u-sel').checked,
+          no_reprint:document.getElementById('u-noreprint').checked};
+  }else{
+    var acts=readActions();
+    if(!Object.keys(acts).length){ BP.toast('请至少勾选一个动作','err'); return; }
+    if(!MTGT.length){ BP.toast('请添加目标','err'); return; }
+    conf={actions:acts, actors:MSEL.all?'all':MSEL.ids, targets:MTGT,
+          sleep:[parseInt(document.getElementById('m-smin').value||3),parseInt(document.getElementById('m-smax').value||7)]};
+  }
+  var body={name:document.getElementById('m-name').value, cron:curCron(), kind:MKIND, config:conf};
+  try{
+    if(EDIT_ID) await BP.api('/api/tasks/'+EDIT_ID+'/config',{method:'PUT',body:JSON.stringify(body)});
+    else await BP.api('/api/tasks',{method:'POST',body:JSON.stringify(body)});
+    BP.toast('已保存'); closeM(); loadList();
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+
+/* ================= 自动化规则 ================= */
+async function AUTO_SHOW(kind){
+  document.getElementById('autoCard').style.display='';
+  try{ AU.policy=await BP.api('/api/automation/policy'); }catch(e){}
+  document.getElementById('au-kind').querySelectorAll('button').forEach(function(b){
+    b.classList.toggle('on',b.getAttribute('data-v')===kind);
+    b.onclick=function(){ AUTO_SHOW(b.getAttribute('data-v')); };
+  });
+  AU.kind=kind;
+  document.querySelectorAll('.au-sec').forEach(function(s){
+    s.style.display=(s.getAttribute('data-au')===kind)?'':'none';
+  });
+  var descs={autodm:'粉丝关注你之后自动发一条私信，适合感谢关注、引导进群。',
+             autoreply:'有人私信你时由 AI 自动回复，可设置黑名单与屏蔽词。',
+             autocomment:'有人在你的视频下评论时自动回复。'};
+  document.getElementById('au-desc').textContent=descs[kind]||'';
+  if(AU.policy&&AU.policy.policy&&AU.policy.policy[kind]){
+    var p=AU.policy.policy[kind];
+    document.getElementById('au-policy').textContent='最小间隔 '+p.min_interval+' 分钟 · 最多 '+p.max_count+' 条';
+    document.getElementById('au-iv-hint').textContent='（≥'+p.min_interval+'）';
+    document.getElementById('au-iv').value=Math.max(p.min_interval,60);
+  }
+  await loadRules();
+}
+document.getElementById('au-close').onclick=function(){ document.getElementById('autoCard').style.display='none'; };
+document.getElementById('au-add').onclick=function(){
+  AU.editId=null;
+  document.querySelectorAll('#au-dm-scope button').forEach(function(b,i){ b.classList.toggle('on',i===0); });
+  document.getElementById('au-form').style.display='';
+};
+document.querySelectorAll('#au-dm-scope button').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('#au-dm-scope button').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on');
+    document.getElementById('au-dm-uidrow').style.display=b.getAttribute('data-v')==='uid'?'':'none';
+  };
+});
+document.querySelectorAll('#au-ar-mode button').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('#au-ar-mode button').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on');
+    document.getElementById('au-ar-wlrow').style.display=b.getAttribute('data-v')==='whitelist'?'':'none';
+  };
+});
+
+async function loadRules(){
+  var d=await BP.api('/api/automation');
+  var list=(d.rules||[]).filter(function(r){return r.kind===AU.kind;});
+  document.getElementById('au-acc').innerHTML=ACCS.map(function(a){
+    return '<option value="'+a.id+'">'+BP.esc(accName(a))+'</option>';
+  }).join('');
+  var box=document.getElementById('au-list');
+  if(!list.length){ box.innerHTML='<p class="hint">还没有规则。</p>'; return; }
+  box.innerHTML='<div class="tbl-scroll"><table><thead><tr><th>账号</th><th>间隔</th><th>状态</th><th>操作</th></tr></thead><tbody>'
+    +list.map(function(r){
+        var a=ACCS.filter(function(x){return x.id===r.account_id})[0];
+        return '<tr><td>'+BP.esc(a?accName(a):('#'+r.account_id))+'</td><td>'+r.interval+' 分钟</td>'
+          +'<td>'+(r.enabled?'<span class="tag ok">启用</span>':'<span class="tag gray">停用</span>')+'</td>'
+          +'<td><button class="btn danger sm" onclick="delRule('+r.id+')">删除</button></td></tr>';
+      }).join('')+'</tbody></table></div>';
+}
+async function delRule(id){
+  if(!confirm('删除该规则？')) return;
+  await BP.api('/api/automation/'+id,{method:'DELETE'});
+  BP.toast('已删除'); loadRules();
+}
+document.getElementById('au-save').onclick=async function(){
+  var acc=document.getElementById('au-acc').value;
+  var iv=parseInt(document.getElementById('au-iv').value||60);
+  var cfg={};
+  if(AU.kind==='autodm'){
+    cfg={scope:document.querySelector('#au-dm-scope .on').getAttribute('data-v'),
+         uids:document.getElementById('au-dm-uids').value,
+         template:document.getElementById('au-dm-tpl').value,
+         blacklist:document.getElementById('au-dm-bl').value,
+         max:parseInt(document.getElementById('au-dm-max').value||5)};
+  }else if(AU.kind==='autoreply'){
+    cfg={mode:document.querySelector('#au-ar-mode .on').getAttribute('data-v'),
+         whitelist:document.getElementById('au-ar-wl').value,
+         blacklist:document.getElementById('au-ar-bl').value,
+         blockwords:document.getElementById('au-ar-bw').value,
+         cooldown:parseInt(document.getElementById('au-ar-cd').value||120),
+         max:parseInt(document.getElementById('au-ar-max').value||3)};
+  }else{
+    cfg={template:document.getElementById('au-cm-tpl').value,
+         blacklist:document.getElementById('au-cm-bl').value,
+         max:parseInt(document.getElementById('au-cm-max').value||5)};
+  }
+  try{
+    await BP.api('/api/automation',{method:'POST',body:JSON.stringify({
+      kind:AU.kind, account_id:acc?parseInt(acc):null, interval:iv, config:cfg, enabled:1})});
+    BP.toast('规则已保存');
+    document.getElementById('au-form').style.display='none';
+    loadRules();
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+
+document.getElementById('aiBtn').onclick=function(){ location.href='/ai'; };
+document.getElementById('monBtn').onclick=function(){ location.href='/tasks'; };
+
+/* ================= 初始化 ================= */
+BP.api('/api/accounts').then(function(d){
+  ACCS=d.accounts||[];
+  renderMact(); mRenderEmotes(); mRenderOpus(); renderMtgt();
+  BP.api('/api/templates?kind=interact').then(function(t){
+    var tp=t.templates||[];
+    document.getElementById('i-tpl').innerHTML='<option value="">— 不使用模板 —</option>'
+      +tp.map(function(x){return '<option value="'+x.id+'">'+BP.esc(x.name)+'</option>'}).join('');
+    document.getElementById('i-tpl').onchange=function(){
+      var hit=tp.filter(function(x){return String(x.id)===this.value}.bind(this))[0];
+      if(hit){ applyInteractCfg(hit.config); BP.toast('已载入模板'); }
+    };
+  }).catch(function(){});
+  loadList();
+}).catch(function(e){ BP.toast(e.message,'err'); });
+</script>
+{% endblock %}

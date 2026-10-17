@@ -1,0 +1,647 @@
+{% extends "base.html" %}
+{% set nav = 'publish' %}
+{% block title %}投稿{% endblock %}
+
+{% block content %}
+<div class="page-head"><h1>视频投稿</h1><div class="spacer"></div><span class="hint" id="traffic-sum"></span></div>
+
+<div class="tabs">
+  <button id="t-up" class="active" onclick="tab('up')">投稿</button>
+  <button id="t-tpl" onclick="tab('tpl')">模板</button>
+  <button id="t-vf" onclick="tab('vf')">服务器视频库</button>
+  <button id="t-cov" onclick="tab('cov')">封面库</button>
+  <button id="t-rec" onclick="tab('rec')">投稿记录</button>
+</div>
+
+<!-- ============ 投稿 ============ -->
+<div id="pane-up">
+  <div class="card">
+    <div class="card-hd"><i class="dot"></i>上传方式</div>
+    <div class="card-bd">
+      <div class="seg" id="mode">
+        <button data-v="local" class="on">本地上传（不耗服务器流量）</button>
+        <button data-v="server">服务器上传</button>
+      </div>
+      <p class="hint" id="mode-tip" style="margin-top:10px"></p>
+
+      <label class="lbx" for="save-lib" style="margin-top:12px">
+        <input type="checkbox" id="save-lib" checked>
+        <span><b>自动上传到视频库</b><span class="hint">：走服务器上传时把视频再存一份到「服务器视频库」，以后可重复投稿、不用重新上传。占用视频库容量。</span></span>
+      </label>
+
+      <div class="field" style="margin-top:14px">
+        <label>投稿账号 <span class="hint" id="acc-hint"></span></label>
+        <div class="pick" style="gap:8px;margin-bottom:8px">
+          <button class="btn ghost sm" type="button" id="acc-all">全选</button>
+          <button class="btn ghost sm" type="button" id="acc-none">清空</button>
+          <button class="btn ghost sm" type="button" id="acc-toggle">收起</button>
+          <span class="clp-sum" id="acc-sum"></span>
+          <span class="meta" id="acc-count"></span>
+        </div>
+        <div class="acc-pick" id="acc-list"><span class="hint">加载中…</span></div>
+      </div>
+
+      <div class="field" id="iv-row" style="display:none">
+        <label>投稿间隔范围（多个账号时生效）</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="number" id="iv-min" min="0" max="86400" value="60" style="width:104px"> 秒 至
+          <input type="number" id="iv-max" min="0" max="86400" value="180" style="width:104px"> 秒
+          <button class="btn ghost sm" type="button" data-iv="60,180">1~3 分钟</button>
+          <button class="btn ghost sm" type="button" data-iv="180,300">3~5 分钟</button>
+          <button class="btn ghost sm" type="button" data-iv="600,900">10~15 分钟</button>
+        </div>
+        <p class="hint">上一个账号投稿完成后，再等这么久才提交下一个（避免批量风控）。</p>
+      </div>
+
+      <div class="field" id="row-fromlib">
+        <label>视频来源 <span class="hint">可直接用「服务器视频库」里已上传的视频；选中后无需再上传</span></label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn ghost sm" type="button" id="lib-pick">📚 从视频库选择</button>
+          <span class="lib-sel" id="lib-sel">当前：用下面上传的视频文件</span>
+          <button class="btn ghost sm" type="button" id="lib-clear" style="display:none">清除选择</button>
+        </div>
+        <select id="libfile" style="display:none"><option value="">— 选择已上传的视频 —</option></select>
+      </div>
+
+      <div class="drop" id="drop">
+        <div class="big">点击选择视频，或把视频拖到这里</div>
+        <div class="hint" id="drop-tip"></div>
+      </div>
+      <input type="file" id="file" accept="video/*" style="display:none">
+      <div id="file-info" style="margin-top:12px"></div>
+      <div class="bar" id="upbar" style="display:none;margin-top:12px"><i style="width:0"></i></div>
+      <div class="hint" id="uptip" style="margin-top:6px"></div>
+      <div id="traffic-box" style="margin-top:12px"></div>
+
+      <div class="field" style="margin-top:16px">
+        <label>视频封面（可选）</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <input id="f-cover" type="text" placeholder="粘贴 B 站封面链接，或封面库编号（如 3）" style="flex:1;min-width:200px">
+          <button class="btn ghost sm" id="cover-lib-btn">🖼 从封面库选择</button>
+          <button class="btn ghost sm" id="cover-btn">选择本地图片</button>
+        </div>
+        <input type="file" id="cover-file" accept="image/*" style="display:none">
+        <div class="cv-ratio"><span class="hint">比例固定 <b>16:9</b>（B 站推荐尺寸）</span></div>
+        <div id="cover-pv" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <div class="card-hd"><i class="dot"></i>稿件信息</div>
+    <div class="card-bd">
+      <div class="field" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <label>从模板载入 / 保存当前为模板</label>
+          <select id="tpl-pick"><option value="">— 选择模板 —</option></select>
+        </div>
+        <button class="btn ghost sm" id="tpl-save">存为模板</button>
+      </div>
+      <div class="field"><label>标题（必填）</label><input id="f-title" type="text" maxlength="80" placeholder="稿件标题"></div>
+      <div class="grid2">
+        <div class="field"><label>分区</label><select id="f-tid"></select></div>
+        <div class="field"><label>标签（逗号分隔）</label><input id="f-tag" type="text" placeholder="vlog,生活"></div>
+      </div>
+      <div class="field"><label>简介</label><textarea id="f-desc" rows="3"></textarea></div>
+      <div class="grid2">
+        <div class="field"><label>类型</label>
+          <select id="f-copyright"><option value="1">自制</option><option value="2">转载</option></select>
+        </div>
+        <div class="field" id="row-source" style="display:none"><label>转载来源</label><input id="f-source" type="text" placeholder="https://..."></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>定时发布（留空立即发布）</label><input id="f-dtime" type="datetime-local"></div>
+        <div class="field"><label>同步到动态</label><input id="f-dynamic" type="text" placeholder="留空不同步"></div>
+      </div>
+      <p class="sub">互动设置</p>
+      <div class="pick" style="gap:16px">
+        <label class="switch"><input type="checkbox" id="f-close-danmu"> 关闭弹幕</label>
+        <label class="switch"><input type="checkbox" id="f-close-reply"> 关闭评论</label>
+        <label class="switch"><input type="checkbox" id="f-sel-reply"> 精选评论</label>
+        <label class="switch"><input type="checkbox" id="f-noreprint"> 禁止转载</label>
+      </div>
+      <p class="sub">上传增强（防重复）</p>
+      <div class="pick" style="gap:16px">
+        <label class="switch"><input type="checkbox" id="f-md5"> 修改视频 MD5</label>
+        <label class="switch"><input type="checkbox" id="f-aititle"> AI 自动改标题</label>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px">
+        <button class="btn" id="pubBtn">开始投稿</button>
+        <button class="btn blue" id="cronBtn">加入定时任务</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 模板 ============ -->
+<div id="pane-tpl" style="display:none">
+  <div class="card">
+    <div class="card-hd"><i class="dot"></i>投稿模板
+      <span style="flex:1"></span>
+      <button class="btn ghost sm" id="tpl-batch-del">批量删除</button>
+      <button class="btn ghost sm" id="tpl-batch-run">批量投稿</button>
+    </div>
+    <div class="card-bd" style="padding:0">
+      <div class="tbl-scroll">
+        <table><thead><tr><th><input type="checkbox" id="tpl-all"></th><th>名称</th><th>标题</th><th>分区</th><th>操作</th></tr></thead>
+          <tbody id="tpl-list"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 服务器视频库 ============ -->
+<div id="pane-vf" style="display:none">
+  <div class="card">
+    <div class="card-hd"><i class="dot"></i>服务器视频库</div>
+    <div class="card-bd">
+      <div class="drop" id="vf-drop">
+        <div class="big">点击上传视频到服务器视频库</div>
+        <div class="hint" id="vf-tip"></div>
+      </div>
+      <input type="file" id="vf-file" accept="video/*" style="display:none">
+      <div class="bar" id="vf-bar" style="display:none;margin-top:10px"><i style="width:0"></i></div>
+      <div class="tbl-scroll" style="margin-top:14px">
+        <table><thead><tr><th>编号</th><th>文件名</th><th>大小</th><th>操作</th></tr></thead>
+          <tbody id="vf-list"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 封面库 ============ -->
+<div id="pane-cov" style="display:none">
+  <div class="card">
+    <div class="card-hd"><i class="dot"></i>封面库
+      <span style="flex:1"></span>
+      <select id="cv-acc" style="max-width:180px"><option value="">全部</option></select>
+      <button class="btn ghost sm" id="cv-upbtn">上传封面</button>
+      <input type="file" id="cv-upfile" accept="image/*" style="display:none">
+    </div>
+    <div class="card-bd">
+      <div id="cv-list" class="cv-grid"><p class="hint">加载中…</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 投稿记录 ============ -->
+<div id="pane-rec" style="display:none">
+  <div class="card">
+    <div class="card-hd"><i class="dot"></i>投稿记录 <span class="hint" id="rec-traffic"></span></div>
+    <div class="card-bd" style="padding:0">
+      <div class="tbl-scroll">
+        <table><thead><tr><th>时间</th><th>账号</th><th>标题</th><th>BV 号</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody id="rec-list"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var ACCS=[], SEL_ACC=[], CHOSEN=null, MODE='local', LIB=[], COVERS=[], TPLS=[], LIBPICK=null;
+var OPTS={};
+const SECTIONS_FALLBACK=[['171','电子竞技'],['17','单机游戏'],['21','日常'],['138','搞笑'],['23','美食'],['95','数码'],['181','影视']];
+
+function human(n){
+  n=Number(n||0);
+  var u=['B','KB','MB','GB'],i=0;
+  while(n>=1024&&i<u.length-1){n/=1024;i++;}
+  return (i<2?Math.round(n):n.toFixed(2))+' '+u[i];
+}
+function tab(v){
+  ['up','tpl','vf','cov','rec'].forEach(function(k){
+    document.getElementById('t-'+k).classList.toggle('active',k===v);
+    document.getElementById('pane-'+k).style.display=(k===v?'':'none');
+  });
+  if(v==='tpl') loadTpls();
+  if(v==='vf') loadLib();
+  if(v==='cov') loadCovers();
+  if(v==='rec') loadRec();
+}
+
+/* ---- 账号多选 ---- */
+function renderAccs(){
+  document.getElementById('acc-list').innerHTML=ACCS.length?ACCS.map(function(a){
+    return '<span class="chip '+(SEL_ACC.indexOf(a.id)>=0?'on':'')+'" data-id="'+a.id+'">'
+      +BP.esc(a.alias_name||a.uname||('#'+a.id))+' ('+BP.esc(a.alias_mid||a.mid)+')</span>';
+  }).join(''):'<span class="hint">还没有账号，先去「账号」页添加。</span>';
+  document.querySelectorAll('#acc-list .chip').forEach(function(c){
+    c.onclick=function(){
+      var id=parseInt(c.getAttribute('data-id')), i=SEL_ACC.indexOf(id);
+      if(i>=0) SEL_ACC.splice(i,1); else SEL_ACC.push(id);
+      renderAccs(); syncIvRow();
+    };
+  });
+  document.getElementById('acc-sum').textContent=SEL_ACC.length?('已选 '+SEL_ACC.length+' 个'):'未选账号';
+  document.getElementById('acc-count').textContent='共 '+ACCS.length+' 个';
+  document.getElementById('acc-hint').textContent=SEL_ACC.length>1?'（多个账号会依次投稿）':'';
+  syncIvRow();
+}
+function syncIvRow(){
+  document.getElementById('iv-row').style.display=SEL_ACC.length>1?'':'none';
+  document.getElementById('acc-count').textContent='共 '+ACCS.length+' 个，已选 '+SEL_ACC.length;
+}
+document.getElementById('acc-all').onclick=function(){ SEL_ACC=ACCS.map(function(a){return a.id}); renderAccs(); };
+document.getElementById('acc-none').onclick=function(){ SEL_ACC=[]; renderAccs(); };
+document.getElementById('acc-toggle').onclick=function(){
+  var box=document.getElementById('acc-list');
+  var hide=box.style.display!=='none';
+  box.style.display=hide?'none':'';
+  this.textContent=hide?'展开':'收起';
+};
+document.querySelectorAll('[data-iv]').forEach(function(b){
+  b.onclick=function(){
+    var p=b.getAttribute('data-iv').split(',');
+    document.getElementById('iv-min').value=p[0];
+    document.getElementById('iv-max').value=p[1];
+  };
+});
+
+/* ---- 上传方式 ---- */
+document.querySelectorAll('#mode button').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('#mode button').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on'); MODE=b.getAttribute('data-v');
+    document.getElementById('mode-tip').textContent = MODE==='local'
+      ? '本地上传：视频从你的浏览器直传 B 站，不消耗服务器流量。'
+      : '服务器上传：视频先传到本站再转投 B 站，按文件大小扣流量。';
+  };
+});
+document.getElementById('mode-tip').textContent='本地上传：视频从你的浏览器直传 B 站，不消耗服务器流量。';
+
+/* ---- 选文件 ---- */
+var drop=document.getElementById('drop');
+drop.onclick=function(){ document.getElementById('file').click(); };
+drop.ondragover=function(e){ e.preventDefault(); };
+drop.ondrop=function(e){
+  e.preventDefault();
+  if(e.dataTransfer.files.length) pickFile(e.dataTransfer.files[0]);
+};
+document.getElementById('file').onchange=function(){ if(this.files[0]) pickFile(this.files[0]); };
+function pickFile(f){
+  CHOSEN=f; LIBPICK=null;
+  document.getElementById('lib-sel').textContent='当前：用下面上传的视频文件';
+  document.getElementById('lib-clear').style.display='none';
+  document.getElementById('file-info').innerHTML=
+    '<span class="tag ok">已选择</span> '+BP.esc(f.name)+' <span class="hint">'+human(f.size)+'</span>';
+  document.getElementById('drop-tip').textContent=f.name;
+  if(!document.getElementById('f-title').value){
+    document.getElementById('f-title').value=f.name.replace(/\.[^.]+$/,'');
+  }
+}
+
+/* ---- 从视频库选 ---- */
+document.getElementById('lib-pick').onclick=async function(){
+  await loadLib();
+  if(!LIB.length){ BP.toast('视频库是空的，先去「服务器视频库」上传','err'); return; }
+  var pick=prompt('输入要用的视频编号：\n'+LIB.map(function(f){return f.code+' - '+f.name+ ' ('+f.size_h+')'}).join('\n'));
+  var hit=LIB.filter(function(f){return String(f.code)===String(pick)}).length
+    ? LIB.filter(function(f){return String(f.code)===String(pick)})[0]
+    : LIB[parseInt(pick)-1];
+  if(!hit){ BP.toast('没找到这个编号','err'); return; }
+  LIBPICK=hit; CHOSEN=null;
+  document.getElementById('lib-sel').textContent='当前：视频库 #'+hit.code+' '+hit.name;
+  document.getElementById('lib-clear').style.display='';
+  document.getElementById('file-info').innerHTML='<span class="tag blue">视频库</span> '+BP.esc(hit.name)
+    +' <span class="hint">'+hit.size_h+'</span>';
+};
+document.getElementById('lib-clear').onclick=function(){
+  LIBPICK=null;
+  document.getElementById('lib-sel').textContent='当前：用下面上传的视频文件';
+  document.getElementById('lib-clear').style.display='none';
+  document.getElementById('file-info').innerHTML='';
+};
+
+/* ---- 封面 ---- */
+document.getElementById('cover-btn').onclick=function(){ document.getElementById('cover-file').click() };
+document.getElementById('cover-file').onchange=async function(){
+  if(!this.files[0]) return;
+  var fd=new FormData(); fd.append('file',this.files[0]); fd.append('ratio','16:9');
+  try{
+    var r=await fetch('/api/publish/covers',{method:'POST',body:fd,credentials:'same-origin'});
+    var d=await r.json();
+    if(!r.ok) throw new Error(d.detail||'上传失败');
+    document.getElementById('f-cover').value=String(d.code);
+    document.getElementById('cover-pv').innerHTML='<img src="/api/publish/covers/'+d.id+'/raw" style="max-width:220px;border-radius:8px">';
+    BP.toast('封面已上传，编号 '+d.code);
+  }catch(e){ BP.toast(e.message,'err'); }
+  this.value='';
+};
+document.getElementById('cover-lib-btn').onclick=async function(){
+  await loadCovers();
+  if(!COVERS.length){ BP.toast('封面库是空的','err'); return; }
+  var n=prompt('输入封面编号：\n'+COVERS.map(function(c){return c.code}).join(', '));
+  var hit=COVERS.filter(function(c){return String(c.code)===String(n)})[0];
+  if(!hit){ BP.toast('没找到','err'); return; }
+  document.getElementById('f-cover').value=String(hit.code);
+  document.getElementById('cover-pv').innerHTML='<img src="'+hit.url+'" style="max-width:220px;border-radius:8px">';
+};
+
+/* ---- 稿件配置 ---- */
+function readConfig(){
+  return {
+    title:document.getElementById('f-title').value.trim(),
+    tid:document.getElementById('f-tid').value,
+    tag:document.getElementById('f-tag').value.trim(),
+    desc:document.getElementById('f-desc').value,
+    cover:document.getElementById('f-cover').value.trim(),
+    source:document.getElementById('f-source').value.trim(),
+    copyright:parseInt(document.getElementById('f-copyright').value||1),
+    dtime:document.getElementById('f-dtime').value
+      ? Math.floor(new Date(document.getElementById('f-dtime').value).getTime()/1000) : 0,
+    dynamic:document.getElementById('f-dynamic').value.trim(),
+    close_danmu:document.getElementById('f-close-danmu').checked,
+    close_reply:document.getElementById('f-close-reply').checked,
+    sel_reply:document.getElementById('f-sel-reply').checked,
+    no_reprint:document.getElementById('f-noreprint').checked,
+    md5:document.getElementById('f-md5').checked,
+    ai_title:document.getElementById('f-aititle').checked,
+  };
+}
+function applyConfig(c){
+  if(!c) return;
+  ['title','tag','desc','cover','source','dynamic'].forEach(function(k){
+    var el=document.getElementById('f-'+k);
+    if(el && c[k]!=null) el.value=c[k];
+  });
+  if(c.tid){ var s=document.getElementById('f-tid'); s.value=c.tid; }
+  if(c.copyright) document.getElementById('f-copyright').value=c.copyright;
+  ['close_danmu','close_reply','sel_reply','no_reprint','md5','ai_title'].forEach(function(k){
+    var el=document.getElementById('f-'+k.replace(/_/g,'-'));
+    if(el) el.checked=!!c[k];
+  });
+}
+document.getElementById('f-copyright').onchange=function(){
+  document.getElementById('row-source').style.display=this.value==='2'?'':'none';
+};
+
+/* ---- 投稿主流程（三步：preupload -> 分片 -> submit） ---- */
+document.getElementById('pubBtn').onclick=async function(){
+  var cfg=readConfig();
+  if(!cfg.title){ BP.toast('请填写标题','err'); return; }
+  if(!SEL_ACC.length){ BP.toast('请选择投稿账号','err'); return; }
+  if(!CHOSEN && !LIBPICK){ BP.toast('请选择视频文件','err'); return; }
+  this.disabled=true;
+
+  var lines=[], done=0, fail=0;
+  for(var i=0;i<SEL_ACC.length;i++){
+    var aid=SEL_ACC[i];
+    var acc=ACCS.filter(function(x){return x.id===aid})[0]||{};
+    var nm=acc.alias_name||acc.uname||('#'+aid);
+    try{
+      if(LIBPICK){
+        document.getElementById('uptip').textContent='['+(i+1)+'/'+SEL_ACC.length+'] '+nm+'：从视频库投稿…';
+        var r=await BP.api('/api/publish/server',{method:'POST',body:JSON.stringify({
+          account_id:aid, file_id:LIBPICK.id, config:cfg})});
+        done++; lines.push('✅ '+BP.esc(nm)+'：'+BP.esc(r.message||'已提交'));
+        continue;
+      }
+      var sid=await BP.api('/api/publish/session',{method:'POST',body:JSON.stringify({
+        kind:MODE, name:CHOSEN.name, size:CHOSEN.size, account_id:aid,
+        info:{config:cfg, account_id:aid, name:CHOSEN.name}
+      })}).then(function(x){return x.id});
+      document.getElementById('uptip').textContent='['+(i+1)+'/'+SEL_ACC.length+'] '+nm+'：申请上传凭证…';
+      var pre=await BP.api('/api/publish/preupload',{method:'POST',body:JSON.stringify({
+        account_id:aid, filename:CHOSEN.name, size:CHOSEN.size})});
+
+      var chunkSize=pre.chunk_size||8*1024*1024;
+      var total=Math.ceil(CHOSEN.size/chunkSize)||1;
+      for(var p=0;p<total;p++){
+        var start=p*chunkSize, end=Math.min(start+chunkSize, CHOSEN.size);
+        var blob=CHOSEN.slice(start,end);
+        var fd=new FormData();
+        fd.append('file',blob,'chunk');
+        fd.append('start',String(start)); fd.append('end',String(end));
+        fd.append('partNumber',String(p+1)); fd.append('account_id',String(aid));
+        fd.append('save_lib',document.getElementById('save-lib').checked?'true':'false');
+        var res=await fetch('/api/publish/upos-put',{method:'POST',body:fd,credentials:'same-origin'});
+        if(!res.ok){
+          var m=''; try{ m=(await res.json()).detail }catch(e){}
+          throw new Error(m||('分片中转失败 HTTP '+res.status));
+        }
+        var pct=Math.round((p+1)/total*100);
+        document.getElementById('uptip').textContent='['+(i+1)+'/'+SEL_ACC.length+'] '+nm+'：上传 '+pct+'%';
+        document.getElementById('upbar').style.display='';
+        document.getElementById('upbar').firstElementChild.style.width=pct+'%';
+      }
+      document.getElementById('uptip').textContent='['+(i+1)+'/'+SEL_ACC.length+'] '+nm+'：提交稿件…';
+      var out=await BP.api('/api/publish/submit',{method:'POST',body:JSON.stringify({
+        account_id:aid, upload_id:pre.upload_id, chunks:total,
+        upload_url:pre.upload_url, auth:pre.auth, filename:pre.filename,
+        biz_id:pre.biz_id, size:CHOSEN.size, config:cfg, session_id:sid})});
+      done++; lines.push('✅ '+BP.esc(nm)+'：'+BP.esc(out.bvid||out.message||'已提交'));
+    }catch(e){
+      fail++; lines.push('❌ '+BP.esc(nm)+'：'+BP.esc(e.message));
+    }
+    if(i<SEL_ACC.length-1){
+      var lo=parseInt(document.getElementById('iv-min').value||60);
+      var hi=parseInt(document.getElementById('iv-max').value||180);
+      var wait=Math.round(lo+Math.random()*(hi-lo));
+      document.getElementById('uptip').textContent='等待 '+wait+' 秒再投下一个账号…';
+      await new Promise(function(r){setTimeout(r,wait*1000)});
+    }
+  }
+  document.getElementById('traffic-box').innerHTML=
+    '<div class="hi">成功 '+done+' 个'+(fail?('，失败 '+fail+' 个'):'')+'</div>'
+    +'<div class="hint" style="margin-top:6px">'+lines.join('<br>')+'</div>';
+  BP.toast('投稿完成：成功 '+done+(fail?('，失败 '+fail):''));
+  this.disabled=false;
+  loadRec();
+};
+
+document.getElementById('cronBtn').onclick=async function(){
+  var cfg=readConfig();
+  if(!cfg.title){ BP.toast('请填写标题','err'); return; }
+  var name=prompt('定时任务名称','每日投稿');
+  if(!name) return;
+  var t=prompt('几点发布（HH:MM）','09:00')||'09:00';
+  var p=t.split(':');
+  var cron=parseInt(p[1]||0)+' '+parseInt(p[0]||9)+' * * *';
+  try{
+    await BP.api('/api/tasks',{method:'POST',body:JSON.stringify({
+      name:name, cron:cron, kind:'upload',
+      config:Object.assign({account_id:SEL_ACC[0]||null, file_id:LIBPICK?LIBPICK.id:null},cfg)
+    })});
+    BP.toast('已加入定时任务');
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+
+/* ---- 模板 ---- */
+async function loadTpls(){
+  try{
+    var d=await BP.api('/api/templates?kind=publish');
+    TPLS=d.templates||[];
+  }catch(e){ TPLS=[]; }
+  document.getElementById('tpl-pick').innerHTML='<option value="">— 选择模板 —</option>'
+    +TPLS.map(function(t){return '<option value="'+t.id+'">'+BP.esc(t.name)+'</option>'}).join('');
+  var tb=document.getElementById('tpl-list');
+  tb.innerHTML=TPLS.length?TPLS.map(function(t){
+    return '<tr><td><input type="checkbox" data-t="'+t.id+'"></td><td>'+BP.esc(t.name)+'</td>'
+      +'<td>'+BP.esc((t.config||{}).title||'')+'</td><td>'+BP.esc((t.config||{}).tid||'')+'</td>'
+      +'<td><button class="btn ghost sm" onclick="useTpl('+t.id+')">使用</button> '
+      +'<button class="btn danger sm" onclick="delTpl('+t.id+')">删除</button></td></tr>';
+  }).join(''):'<tr><td colspan="5" class="empty">还没有模板</td></tr>';
+}
+document.getElementById('tpl-pick').onchange=function(){
+  var id=this.value; if(!id) return;
+  var t=TPLS.filter(function(x){return String(x.id)===id})[0];
+  if(t){ applyConfig(t.config); BP.toast('已载入模板'); }
+};
+function useTpl(id){
+  var t=TPLS.filter(function(x){return x.id===id})[0];
+  if(t){ applyConfig(t.config); tab('up'); BP.toast('已载入模板'); }
+}
+async function delTpl(id){
+  if(!confirm('删除该模板？')) return;
+  await BP.api('/api/templates/'+id,{method:'DELETE'});
+  BP.toast('已删除'); loadTpls();
+}
+document.getElementById('tpl-save').onclick=async function(){
+  var n=prompt('模板名称','投稿模板'); if(!n) return;
+  try{
+    await BP.api('/api/templates',{method:'POST',body:JSON.stringify({
+      name:n, kind:'publish', config:readConfig()})});
+    BP.toast('已存为模板'); loadTpls();
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+document.getElementById('tpl-all').onchange=function(){
+  document.querySelectorAll('[data-t]').forEach(function(c){ c.checked=this.checked }.bind(this));
+};
+document.getElementById('tpl-batch-del').onclick=async function(){
+  var ids=Array.from(document.querySelectorAll('[data-t]:checked')).map(function(c){return parseInt(c.getAttribute('data-t'))});
+  if(!ids.length){ BP.toast('请先勾选模板','err'); return; }
+  if(!confirm('删除选中的 '+ids.length+' 个模板？')) return;
+  await BP.api('/api/templates/batch-delete',{method:'POST',body:JSON.stringify({ids:ids})});
+  BP.toast('已删除'); loadTpls();
+};
+document.getElementById('tpl-batch-run').onclick=function(){
+  var ids=Array.from(document.querySelectorAll('[data-t]:checked')).map(function(c){return parseInt(c.getAttribute('data-t'))});
+  if(!ids.length){ BP.toast('请先勾选模板','err'); return; }
+  BP.api('/api/publish/batch',{method:'POST',body:JSON.stringify({template_ids:ids})})
+    .then(function(r){ BP.toast(r.message||'已加入队列'); })
+    .catch(function(e){ BP.toast(e.message,'err'); });
+};
+
+/* ---- 服务器视频库 ---- */
+async function loadLib(){
+  try{ var d=await BP.api('/api/publish/files'); LIB=d.files||[]; }catch(e){ LIB=[]; }
+  document.getElementById('vf-list').innerHTML=LIB.length?LIB.map(function(f){
+    return '<tr><td class="mono">'+f.code+'</td><td>'+BP.esc(f.name)+'</td><td>'+f.size_h+'</td>'
+      +'<td><button class="btn danger sm" onclick="delLib('+f.id+')">删除</button></td></tr>';
+  }).join(''):'<tr><td colspan="4" class="empty">视频库是空的</td></tr>';
+  document.getElementById('libfile').innerHTML='<option value="">— 选择已上传的视频 —</option>'
+    +LIB.map(function(f){return '<option value="'+f.id+'">[编号 '+f.code+'] '+BP.esc(f.name)+' ('+f.size_h+')</option>'}).join('');
+  var el=document.getElementById('vf-tip');
+  if(el) el.textContent='已存 '+LIB.length+' 个文件';
+}
+async function delLib(id){
+  if(!confirm('删除该视频文件？')) return;
+  await BP.api('/api/publish/files/'+id+'/delete',{method:'POST'});
+  BP.toast('已删除'); loadLib();
+}
+var vfd=document.getElementById('vf-drop');
+vfd.onclick=function(){ document.getElementById('vf-file').click() };
+document.getElementById('vf-file').onchange=async function(){
+  if(!this.files[0]) return;
+  var fd=new FormData(); fd.append('file',this.files[0]);
+  document.getElementById('vf-bar').style.display='';
+  try{
+    var r=await fetch('/api/publish/files',{method:'POST',body:fd,credentials:'same-origin'});
+    var d=await r.json();
+    if(!r.ok) throw new Error(d.detail||'上传失败');
+    BP.toast('已上传到视频库：编号 '+d.code);
+    loadLib();
+  }catch(e){ BP.toast(e.message,'err'); }
+  document.getElementById('vf-bar').style.display='none';
+  this.value='';
+};
+
+/* ---- 封面库 ---- */
+async function loadCovers(){
+  try{ var d=await BP.api('/api/publish/covers'); COVERS=d.covers||[]; }catch(e){ COVERS=[]; }
+  document.getElementById('cv-list').innerHTML=COVERS.length?COVERS.map(function(c){
+    return '<div class="cv-it"><img src="'+c.url+'" alt="">'
+      +'<div class="cv-meta"><span class="mono">#'+c.code+'</span> <span class="hint">'+c.ratio+'</span></div>'
+      +'<div class="cv-ops"><button class="btn ghost sm" onclick="useCover('+c.code+')">用这张</button> '
+      +'<button class="btn danger sm" onclick="delCover('+c.id+')">删除</button></div></div>';
+  }).join(''):'<p class="hint">还没有封面，点右上角上传。</p>';
+}
+function useCover(code){
+  document.getElementById('f-cover').value=String(code);
+  var c=COVERS.filter(function(x){return x.code===code})[0];
+  if(c) document.getElementById('cover-pv').innerHTML='<img src="'+c.url+'" style="max-width:220px;border-radius:8px">';
+  tab('up'); BP.toast('已选择封面 #'+code);
+}
+async function delCover(id){
+  if(!confirm('删除该封面？')) return;
+  await BP.api('/api/publish/covers/'+id+'/delete',{method:'POST'});
+  BP.toast('已删除'); loadCovers();
+}
+document.getElementById('cv-upbtn').onclick=function(){ document.getElementById('cv-upfile').click() };
+document.getElementById('cv-upfile').onchange=async function(){
+  if(!this.files[0]) return;
+  var fd=new FormData(); fd.append('file',this.files[0]); fd.append('ratio','16:9');
+  try{
+    var r=await fetch('/api/publish/covers',{method:'POST',body:fd,credentials:'same-origin'});
+    var d=await r.json();
+    if(!r.ok) throw new Error(d.detail||'上传失败');
+    BP.toast('已上传封面 #'+d.code); loadCovers();
+  }catch(e){ BP.toast(e.message,'err'); }
+  this.value='';
+};
+
+/* ---- 投稿记录 ---- */
+async function loadRec(){
+  try{ var d=await BP.api('/api/publish/records'); }catch(e){ return; }
+  var rec=d.records||[];
+  document.getElementById('rec-list').innerHTML=rec.length?rec.map(function(r){
+    return '<tr><td class="hint">'+BP.esc(r.created_at)+'</td><td>'+BP.esc(r.account||'-')+'</td>'
+      +'<td>'+BP.esc(r.title||'')+'</td><td class="mono">'+BP.esc(r.bvid||'-')+'</td>'
+      +'<td>'+(r.status==='ok'?'<span class="tag ok">已提交</span>':'<span class="tag err">失败</span>')+'</td>'
+      +'<td><button class="btn ghost sm" onclick="openBV(\''+BP.esc(r.bvid||'')+'\')">打开</button> '
+      +'<button class="btn danger sm" onclick="delRec('+r.id+')">删除</button></td></tr>';
+  }).join(''):'<tr><td colspan="6" class="empty">还没有投稿记录</td></tr>';
+}
+function openBV(bv){ if(bv) window.open('https://www.bilibili.com/video/'+bv,'_blank'); }
+async function delRec(id){
+  if(!confirm('删除该记录？（不影响 B 站上的稿件）')) return;
+  await BP.api('/api/publish/records/'+id+'/delete',{method:'POST'});
+  BP.toast('已删除'); loadRec();
+}
+
+/* ---- 初始化 ---- */
+(async function(){
+  try{ OPTS=await BP.api('/api/publish/opts'); }catch(e){ OPTS={}; }
+  if(OPTS.md5_random!==0) document.getElementById('f-md5').checked=true;
+  if(OPTS.ai_title!==0) document.getElementById('f-aititle').checked=true;
+  if(OPTS.interval_min!=null) document.getElementById('iv-min').value=OPTS.interval_min;
+  if(OPTS.interval_max!=null) document.getElementById('iv-max').value=OPTS.interval_max;
+
+  var secs=SECTIONS_FALLBACK;
+  try{
+    var d=await BP.api('/api/publish/sections');
+    if(d.sections&&d.sections.length) secs=d.sections.map(function(s){return [String(s.tid),s.name]});
+  }catch(e){}
+  document.getElementById('f-tid').innerHTML=secs.map(function(s){
+    return '<option value="'+s[0]+'"'+(s[0]==='171'?' selected':'')+'>'+s[0]+' '+BP.esc(s[1])+'</option>';
+  }).join('');
+
+  try{
+    var a=await BP.api('/api/accounts');
+    ACCS=a.accounts||[];
+    SEL_ACC=ACCS.length?[ACCS[0].id]:[];
+    renderAccs();
+  }catch(e){}
+
+  try{
+  }catch(e){}
+
+  loadLib(); loadCovers(); loadRec(); loadTpls();
+
+  var t=new URLSearchParams(location.search).get('tpl');
+  if(t){ loadTpls().then(function(){ useTpl(parseInt(t)); }); }
+})();
+</script>
+{% endblock %}

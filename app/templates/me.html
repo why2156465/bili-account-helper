@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% set nav = 'me' %}
+{% block title %}我的{% endblock %}
+
+{% block content %}
+<div class="prof">
+  <div class="p-ava" id="pAva"><span id="pAvaTxt">{{ user.username[0]|upper }}</span></div>
+  <div class="p-info">
+    <div class="p-nm"><span id="pName">{{ user.username }}</span><span id="pVip"></span></div>
+    <div class="p-sub" id="pSub">加载中…</div>
+  </div>
+  <div class="p-quota">
+    <div class="n" id="pQuota">–</div>
+    <div class="t">剩余流量</div>
+  </div>
+</div>
+
+<div class="me-stats">
+  <div class="m"><div class="n" id="mAcc">–</div><div class="t">B站账号</div></div>
+  <div class="m"><div class="n" id="mToday">–</div><div class="t">今日操作</div></div>
+  <div class="m"><div class="n" id="mOps">–</div><div class="t">累计操作</div></div>
+</div>
+
+
+
+<div class="sec-t">常用功能</div>
+<div class="rows">
+  <a class="row" href="/tasks"><span class="r-ic">❤</span><span class="r-t">互赞任务</span><span class="r-g">›</span></a>
+  <a class="row" href="/scheduler"><span class="r-ic">⏰</span><span class="r-t">定时任务<span class="r-d"> · 到点自动执行</span></span><span class="r-g">›</span></a>
+  <a class="row" href="/publish"><span class="r-ic">🎬</span><span class="r-t">投稿 / 视频库</span><span class="r-g">›</span></a>
+  <a class="row" href="/messages"><span class="r-ic">✉</span><span class="r-t">私信<span class="r-d"> · 会话与自动回复</span></span><span class="r-g">›</span></a>
+  <a class="row" href="/ai"><span class="r-ic">🤖</span><span class="r-t">AI 运营助手</span><span class="r-g">›</span></a>
+  <a class="row" href="/web"><span class="r-ic">🌐</span><span class="r-t">网页版 B 站<span class="r-d"> · 推荐 / 消息 / 我的</span></span><span class="r-g">›</span></a>
+</div>
+
+<div class="sec-t">账号</div>
+<div class="rows">
+  <a class="row" href="/accounts"><span class="r-ic">👤</span><span class="r-t">账号管理<span class="r-d" id="rAccN"></span></span><span class="r-g">›</span></a>
+  <a class="row" href="/accounts/add"><span class="r-ic">＋</span><span class="r-t">添加 B 站账号</span><span class="r-g">›</span></a>
+</div>
+
+<div class="sec-t">记录</div>
+<div class="rows">
+  
+  
+  <a class="row" href="/logs"><span class="r-ic">📋</span><span class="r-t">操作日志</span><span class="r-g">›</span></a>
+  <a class="row" href="/notices"><span class="r-ic">🔔</span><span class="r-t">消息通知</span><span class="r-g">›</span></a>
+</div>
+
+<div class="sec-t">其他</div>
+<div class="rows">
+  <a class="row" href="/settings"><span class="r-ic">⚙</span><span class="r-t">账号设置<span class="r-d"> · 密码 / 代理 / 通知</span></span><span class="r-g">›</span></a>
+  <a class="row" href="#" id="logout"><span class="r-ic" style="background:#fff0f0;color:#e03131">⎋</span><span class="r-t">退出登录</span><span class="r-g">›</span></a>
+</div>
+
+<p class="hint" style="text-align:center;margin:18px 0 4px">B站账号管理助手 · 仅限自有账号运营使用</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(async function(){
+  try{
+  }catch(e){}
+  try{
+    var d=await BP.api('/api/dashboard');
+    document.getElementById('mAcc').textContent=d.total;
+    document.getElementById('mToday').textContent=d.today_ops;
+    document.getElementById('mOps').textContent=d.total_ops;
+    document.getElementById('rAccN').textContent=' · '+d.total+' 个账号';
+  }catch(e){}
+})();
+document.getElementById('logout').onclick=async function(e){
+  e.preventDefault();
+  try{ await BP.api('/api/auth/logout',{method:'POST'}); }catch(x){}
+  location.href='/login';
+};
+</script>
+{% endblock %}

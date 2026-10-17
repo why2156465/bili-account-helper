@@ -1,0 +1,74 @@
+[
+ {
+  "path": "/",
+  "code": 200,
+  "type": "text/html; charset=utf-8",
+  "len": 16470
+ },
+ {
+  "path": "/?home=1",
+  "code": 200,
+  "type": "text/html; charset=utf-8",
+  "len": 16470
+ },
+ {
+  "path": "/login",
+  "code": 200,
+  "type": "text/html; charset=utf-8",
+  "len": 12896
+ },
+ {
+  "path": "/register",
+  "code": 200,
+  "type": "text/html; charset=utf-8",
+  "len": 7797
+ },
+ {
+  "path": "/static/app.css?v=20261018d",
+  "code": 200,
+  "type": "text/css; charset=utf-8",
+  "len": 111794
+ },
+ {
+  "path": "/static/client.css?v=20261018d",
+  "code": 200,
+  "type": "text/css; charset=utf-8",
+  "len": 22034
+ },
+ {
+  "path": "/static/img/bili_logo.svg",
+  "code": 200,
+  "type": "image/svg+xml",
+  "len": 15942
+ },
+ {
+  "path": "/static/img/mascot/m22_idea.webp",
+  "code": 200,
+  "type": "application/octet-stream",
+  "len": 33874
+ },
+ {
+  "path": "/static/img/mascot_2233_door.png",
+  "code": 200,
+  "type": "image/png",
+  "len": 13446
+ },
+ {
+  "path": "/static/img/nodata.png",
+  "code": 200,
+  "type": "image/png",
+  "len": 54144
+ },
+ {
+  "path": "/vip",
+  "code": 307,
+  "type": "",
+  "len": 0
+ },
+ {
+  "path": "/dashboard",
+  "code": 307,
+  "type": "",
+  "len": 0
+ }
+]

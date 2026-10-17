@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>注册 · B站账号管理助手</title>
+<link rel="icon" href="/static/img/nodata.png">
+<link rel="stylesheet" href="/static/app.css?v=20261018d">
+<link rel="stylesheet" href="/static/client.css?v=20261018d">
+</head>
+<body>
+<div class="auth">
+  <div class="box">
+    <a class="logo" href="/" style="text-decoration:none"><img src="/static/img/bili_logo.svg" alt="哔哩哔哩"><b style="font-size:16px">B站账号管理助手</b></a>
+    <div class="card">
+      <h2 style="margin:0 0 3px;font-size:17px">注册账号</h2>
+      <p class="hint" style="margin:0 0 18px">邮箱必填；点「获取验证码」会弹出一道计算题，答对后验证码发到邮箱；账号至少 6 位。新用户注册即送 <b style="color:#fb7299">300MB</b> 流量。为防止白嫖，<b>每位用户只能注册一个账号</b>，多开小号将被删号。</p>
+      <div class="hi" id="refTip" style="display:none;margin-bottom:14px"></div>
+      <div class="field"><label>用户名</label><input id="u" type="text" autocomplete="username" placeholder="至少 6 个字符"></div>
+      <div class="field"><label>邮箱</label><input id="em" type="email" autocomplete="email" placeholder="用于接收验证码与安全提醒"></div>
+      <div class="field">
+        <label>邮箱验证码</label>
+        <div style="display:flex;gap:8px">
+          <input id="code" type="text" inputmode="numeric" maxlength="6" placeholder="6 位验证码" style="flex:1">
+          <button class="btn ghost" id="sendCode" type="button" style="white-space:nowrap">获取验证码</button>
+        </div>
+      </div>
+      <div class="field"><label>密码</label><input id="p" type="password" autocomplete="new-password" maxlength="20" placeholder="8-20 位，且包含字母（支持符号）"></div>
+      <div class="field"><label>邀请码 <span style="color:#b6bdc8">（选填）</span></label><input id="inv" type="text" placeholder="好友的邀请码 / 推广码，没有可留空"></div>
+      <button class="btn wide" id="go">注册并登录</button>
+    </div>
+    <div class="foot">已有账号？<a href="/login">去登录</a> · <a href="/">返回首页</a></div>
+      </div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="modal-mask" id="capModal">
+  <div class="modal capm">
+    <div class="hd">安全验证<span class="x" id="capClose">&times;</span></div>
+    <div class="bd">
+      <p class="hint" style="margin:0 0 12px">为防止机器人恶意发送，请先算出这道题的答案；答对后验证码会发送到你的邮箱。</p>
+      <div class="cap-row">
+        <span class="cap-q" id="capq">…</span>
+        <button class="btn ghost sm" id="capre" type="button">换一题</button>
+      </div>
+      <input id="cap" type="text" inputmode="numeric" autocomplete="off" placeholder="填写计算结果" style="margin-top:12px">
+      <div class="cap-err" id="capErr"></div>
+    </div>
+    <div class="ft">
+      <button class="btn ghost" id="capCancel" type="button">取消</button>
+      <button class="btn" id="capGo" type="button">确认并发送验证码</button>
+    </div>
+  </div>
+</div>
+<script>
+function toast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('show')},2600);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+async function api(url,opt){opt=opt||{};opt.headers=Object.assign({'Content-Type':'application/json'},opt.headers||{});const r=await fetch(url,opt);let j=null;try{j=await r.json()}catch(e){}if(!r.ok){throw new Error((j&&(j.detail||j.message))||('请求失败 '+r.status))}return j;}
+var CAPTOK='',CAPANS='';
+async function loadCap(){
+  try{var d=await api('/api/auth/captcha');CAPTOK=d.token;document.getElementById('capq').textContent=d.q;document.getElementById('cap').value='';}catch(e){}
+}
+function capErr(m){var e=document.getElementById('capErr');if(m){e.textContent=m;e.style.display='block';}else{e.style.display='none';}}
+function openCap(){
+  capErr('');loadCap();
+  document.getElementById('capModal').classList.add('show');
+  setTimeout(function(){try{document.getElementById('cap').focus();}catch(e){}},150);
+}
+function closeCap(){document.getElementById('capModal').classList.remove('show');}
+document.getElementById('capClose').onclick=closeCap;
+document.getElementById('capCancel').onclick=closeCap;
+document.getElementById('capre').onclick=function(){capErr('');loadCap();};
+document.getElementById('capModal').addEventListener('click',function(e){if(e.target===this)closeCap();});
+document.getElementById('cap').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();document.getElementById('capGo').click();}});
+var tmr=null;
+function startCd(b,n){b.disabled=true;b.textContent=n+'s 后重发';tmr=setInterval(function(){n--;if(n<=0){clearInterval(tmr);b.disabled=false;b.textContent='获取验证码';}else{b.textContent=n+'s 后重发';}},1000);}
+document.getElementById('sendCode').onclick=function(){
+  if(this.disabled)return;
+  var em=document.getElementById('em').value.trim();
+  if(!em){toast('请先填写邮箱');document.getElementById('em').focus();return;}
+  openCap();
+};
+document.getElementById('capGo').onclick=async function(){
+  var b=this,em=document.getElementById('em').value.trim(),cap=document.getElementById('cap').value.trim();
+  if(!cap){capErr('请填写计算结果');document.getElementById('cap').focus();return;}
+  b.disabled=true;
+  try{
+    var r=await api('/api/auth/send_code',{method:'POST',body:JSON.stringify({email:em,scene:'register',captcha:cap,captcha_token:CAPTOK})});
+    CAPANS=cap;closeCap();toast(r.message||'验证码已发送');
+    startCd(document.getElementById('sendCode'),60);
+  }catch(e){
+    capErr(e.message||'验证失败，请重试');
+    loadCap();
+  }
+  b.disabled=false;
+};
+document.getElementById('go').onclick=async function(){
+  var b=this;b.disabled=true;
+  var un=document.getElementById('u').value.trim(), pw=document.getElementById('p').value;
+  if(pw.length>20){toast('密码最多 20 位');b.disabled=false;return;}
+  try{
+    await api('/api/auth/register',{method:'POST',body:JSON.stringify({username:un,password:pw,email:document.getElementById('em').value.trim(),code:document.getElementById('code').value.trim(),invite:document.getElementById('inv').value.trim()})});
+    try{
+      var r=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:un,password:pw,captcha:CAPANS,captcha_token:CAPTOK})});
+      if(r.need_verify){toast('注册成功！请到登录页完成邮箱安全验证');location.href='/login';return;}
+      location.href='/dashboard';return;
+    }catch(e2){toast('注册成功，请登录');location.href='/login';return;}
+  }catch(e){toast(e.message);b.disabled=false;}
+};
+/* 初始不显示题目，点「获取验证码」时才弹出 */
+capErr('');
+/* 专属推广链接 ?ref=CODE 自动填入邀请码 */
+(function(){
+  var BONUS='300',REWARD='30';
+  try{
+    var m=location.search.match(/[?&]ref=([^&#]+)/);
+    if(m){
+      var code=decodeURIComponent(m[1]).trim();
+      if(code){
+        document.getElementById('inv').value=code;
+        var t=document.getElementById('refTip');
+        t.innerHTML='<b>🎁 好友邀请你加入！</b><br>注册即可领取 <b style="color:#fb7299;font-size:15px">'+BONUS+'MB</b> 新手流量奖励，好友也能获得 '+REWARD+'MB 奖励。<br>邀请码已自动填写：<b>'+esc(code)+'</b>';
+        t.style.display='';
+      }
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

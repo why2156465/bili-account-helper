@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}管理后台{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1 class="ph-title">管理后台</h1>
+  <span class="ph-sub">用户 / 订单 / 账号 / 日志 / 公告 / 兑换码</span>
+  <span class="spacer"></span>
+  <span class="hint">{{ user.username }}</span>
+</div>
+
+<div class="grid" id="stats">
+  <div class="stat"><div class="k">用户总数</div><div class="v" id="s-users">–</div></div>
+  <div class="stat"><div class="k">今日新增</div><div class="v" id="s-new">–</div></div>
+</div>
+<div class="grid" style="margin-top:14px">
+  <div class="stat"><div class="k">B站账号</div><div class="v" id="s-acc">–</div></div>
+  <div class="stat"><div class="k">登录有效</div><div class="v" id="s-accok">–</div></div>
+  <div class="stat"><div class="k">今日操作</div><div class="v" id="s-ops">–</div></div>
+  <div class="stat"><div class="k">累计操作</div><div class="v" id="s-opst">–</div></div>
+</div>
+
+<div class="tabs" style="margin-top:16px">
+  <button id="t-users" class="active" onclick="tab('users')">用户</button>
+  <button id="t-accounts" onclick="tab('accounts')">B站账号</button>
+  <button id="t-logs" onclick="tab('logs')">日志与审计</button>
+  <button id="t-notices" onclick="tab('notices')">公告</button>
+</div>
+
+<div id="pane-users">
+  <div class="searchbar">
+    <span class="s-ic">🔍</span>
+    <input id="uq" type="search" placeholder="搜索用户名 / 邮箱" autocomplete="off">
+  </div>
+  <div class="card">
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>ID</th><th>用户名</th><th>邮箱</th><th>账号</th><th>状态</th><th>注册</th><th>操作</th></tr></thead>
+        <tbody id="uRows"><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+
+<div id="pane-accounts" style="display:none">
+  <div class="card">
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>ID</th><th>归属用户</th><th>昵称</th><th>UID</th><th>粉丝</th><th>等级</th><th>状态</th><th>代理</th><th>体检</th></tr></thead>
+        <tbody id="aRows"><tr><td colspan="9" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="pane-logs" style="display:none">
+  <div class="card">
+    <div class="card-hd"><i class="dot"></i>操作日志</div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>时间</th><th>用户</th><th>动作</th><th>目标</th><th>结果</th></tr></thead>
+        <tbody id="lRows"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-hd"><i class="dot"></i>管理操作审计</div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>时间</th><th>管理员</th><th>动作</th><th>目标</th></tr></thead>
+        <tbody id="auRows"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="pane-notices" style="display:none">
+  <div class="card">
+    <div class="card-hd"><i class="dot"></i>发送公告</div>
+    <div class="card-bd">
+      <div class="field"><label>标题</label><input id="nt-title" type="text" placeholder="例如：系统维护通知"></div>
+      <div class="field"><label>内容</label><textarea id="nt-body" rows="3"></textarea></div>
+      <div class="field"><label>发送对象</label>
+        <select id="nt-user"><option value="">全体用户</option></select>
+      </div>
+      <button class="btn" id="nt-send">发送</button>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-hd"><i class="dot"></i>已发公告</div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr><th>时间</th><th>用户</th><th>标题</th><th>内容</th><th>已读</th></tr></thead>
+        <tbody id="ntRows"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function tab(v){
+  ['users','accounts','logs','notices'].forEach(function(k){
+    document.getElementById('t-'+k).classList.toggle('active',k===v);
+    document.getElementById('pane-'+k).style.display=(k===v?'':'none');
+  });
+  ({users:loadUsers,accounts:loadAccounts,logs:loadLogs,notices:loadNotices}[v]||function(){})();
+}
+
+async function loadStats(){
+  try{
+    var d=await BP.api('/api/admin/stats');
+    document.getElementById('s-users').textContent=d.users;
+    document.getElementById('s-new').textContent=d.new_today;
+    document.getElementById('s-acc').textContent=d.accounts;
+    document.getElementById('s-accok').textContent=d.accounts_ok;
+    document.getElementById('s-ops').textContent=d.ops_today;
+    document.getElementById('s-opst').textContent=d.ops_total;
+  }catch(e){ BP.toast(e.message,'err'); }
+}
+
+async function loadUsers(){
+  var q=document.getElementById('uq').value.trim();
+  try{
+    var d=await BP.api('/api/admin/users?limit=200'+(q?('&q='+encodeURIComponent(q)):''));
+    var tb=document.getElementById('uRows');
+    tb.innerHTML=d.users.length?d.users.map(function(u){
+      return '<tr><td>'+u.id+'</td><td><b>'+BP.esc(u.username)+'</b></td>'
+        +'<td class="hint">'+BP.esc(u.email)+'</td>'
+        +'<td>'+u.accounts+'</td>'
+        +'<td>'+(u.banned?'<span class="tag err">封禁</span>':'<span class="tag ok">正常</span>')+'</td>'
+        +'<td class="hint">'+BP.esc(u.created_at)+'</td>'
+        +'<td nowrap><button class="btn ghost sm" data-ban="'+u.id+'" data-on="'+(u.banned?0:1)+'">'
+        +(u.banned?'解封':'封禁')+'</button></td></tr>';
+    }).join(''):'<tr><td colspan="7" class="empty">没有用户</td></tr>';
+
+    tb.querySelectorAll('[data-ban]').forEach(function(b){
+      b.onclick=async function(){
+        await BP.api('/api/admin/users/'+b.dataset.ban,{method:'POST',body:JSON.stringify({banned:b.dataset.on==='1'})});
+        BP.toast('已更新'); loadUsers(); loadStats();
+      };
+    });
+
+    // 公告对象下拉
+    document.getElementById('nt-user').innerHTML='<option value="">全体用户</option>'
+      +d.users.map(function(u){return '<option value="'+u.id+'">'+BP.esc(u.username)+'</option>'}).join('');
+  }catch(e){ BP.toast(e.message,'err'); }
+}
+document.getElementById('uq').addEventListener('keydown',function(e){ if(e.key==='Enter') loadUsers(); });
+
+async function loadAccounts(){
+  try{
+    var d=await BP.api('/api/admin/accounts');
+    document.getElementById('aRows').innerHTML=d.accounts.length?d.accounts.map(function(a){
+      return '<tr><td>'+a.id+'</td><td>'+BP.esc(a.owner)+'</td><td>'+BP.esc(a.uname||'-')+'</td>'
+        +'<td class="mono">'+BP.esc(a.mid||'-')+'</td><td>'+a.fans+'</td><td>Lv'+a.level+'</td>'
+        +'<td>'+(a.status==='ok'?'<span class="tag ok">正常</span>':'<span class="tag err">'+BP.esc(a.status)+'</span>')+'</td>'
+        +'<td class="hint mono">'+BP.esc(a.proxy||'—')+'</td>'
+        +'<td class="hint">'+BP.esc(a.last_check||'未体检')+'</td></tr>';
+    }).join(''):'<tr><td colspan="9" class="empty">还没有账号</td></tr>';
+  }catch(e){ BP.toast(e.message,'err'); }
+}
+
+async function loadLogs(){
+  try{
+    var d=await BP.api('/api/admin/logs');
+    document.getElementById('lRows').innerHTML=(d.logs||[]).length?d.logs.map(function(l){
+      return '<tr><td class="hint">'+BP.esc(l.created_at)+'</td><td>'+BP.esc(l.user)+'</td>'
+        +'<td>'+BP.esc(l.action)+'</td><td class="mono">'+BP.esc(l.target)+'</td>'
+        +'<td>'+(l.result==='ok'?'<span class="tag ok">成功</span>':'<span class="tag err">'+BP.esc(l.result)+'</span>')+'</td></tr>';
+    }).join(''):'<tr><td colspan="5" class="empty">暂无日志</td></tr>';
+    document.getElementById('auRows').innerHTML=(d.audit||[]).length?d.audit.map(function(a){
+      return '<tr><td class="hint">'+BP.esc(a.created_at)+'</td><td>'+BP.esc(a.admin)+'</td>'
+        +'<td>'+BP.esc(a.action)+'</td><td class="hint">'+BP.esc(a.target)+'</td></tr>';
+    }).join(''):'<tr><td colspan="4" class="empty">暂无审计记录</td></tr>';
+  }catch(e){ BP.toast(e.message,'err'); }
+}
+
+async function loadNotices(){
+  try{
+    var d=await BP.api('/api/admin/notices');
+    document.getElementById('ntRows').innerHTML=d.notices.length?d.notices.map(function(n){
+      return '<tr><td class="hint">'+BP.esc(n.created_at)+'</td><td>'+BP.esc(n.user)+'</td>'
+        +'<td>'+BP.esc(n.title)+'</td><td class="hint">'+BP.esc(n.body).slice(0,60)+'</td>'
+        +'<td>'+(n.read?'<span class="tag ok">已读</span>':'<span class="tag gray">未读</span>')+'</td></tr>';
+    }).join(''):'<tr><td colspan="5" class="empty">还没有公告</td></tr>';
+  }catch(e){ BP.toast(e.message,'err'); }
+}
+document.getElementById('nt-send').onclick=async function(){
+  var t=document.getElementById('nt-title').value.trim();
+  if(!t) return BP.toast('请填标题','err');
+  var uid=document.getElementById('nt-user').value;
+  try{
+    var r=await BP.api('/api/admin/notices',{method:'POST',body:JSON.stringify({
+      title:t, body:document.getElementById('nt-body').value,
+      user_id:uid?parseInt(uid):null})});
+    BP.toast(r.message||'已发送');
+    document.getElementById('nt-title').value='';
+    document.getElementById('nt-body').value='';
+    loadNotices();
+  }catch(e){ BP.toast(e.message,'err'); }
+};
+
+loadStats(); loadUsers();
+</script>
+{% endblock %}
